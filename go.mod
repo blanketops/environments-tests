@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/go-logr/logr v1.4.3
-	github.com/ntlaletsi70/blanketops-environments-api v0.0.8
+	github.com/ntlaletsi70/blanketops-environments-api v0.0.4
 	github.com/ntlaletsi70/blanketops-environments-mvp v0.0.0-20260228172329-7abe01b2b4f2
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
