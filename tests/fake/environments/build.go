@@ -25,7 +25,6 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -34,14 +33,18 @@ import (
 
 	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
+
+	// test data — apimachinery types we built
+	testdata "github.com/ntlaletsi70/blanketops-environments-tests/environments"
 )
 
 // -----------------------------------------------------------------------------
-// Fake Build Domain (CORRECT seam)
-// -----------------------------------------------------------------------------
+// Fake Build Domain (correct seam)
 //
 // This is the ONLY thing we fake.
-// The controller, registry, engine, and command flow are real.
+// The controller, registry, engine, and command flow are all real.
+// -----------------------------------------------------------------------------
+
 type FakeBuildDomain struct {
 	Called bool
 	Cmd    core.Command
@@ -66,7 +69,6 @@ func (f *FakeBuildDomain) GVK() schema.GroupVersionKind {
 
 var testLogger = logr.Discard()
 
-//
 // -----------------------------------------------------------------------------
 // Test helpers
 // -----------------------------------------------------------------------------
@@ -85,45 +87,60 @@ func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
 		Scheme:   k8sClient.Scheme(),
 		Engine:   engine,
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32), // ✅ REQUIRED, add atest tools/events recorder?
+		Recorder: record.NewFakeRecorder(32),
 	}
 }
 
-// Object CR must reference construction from contract, we muust call blanketops-environments
-func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
+// buildFromData converts a testdata.BuildData into the API type the controller
+// expects. This is the bridge between the test data package and the API types.
+func buildFromData(d *testdata.BuildData) *environmentsv1alpha1.Build {
 	return &environmentsv1alpha1.Build{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: "default",
-		},
+		ObjectMeta: d.ObjectMeta,
 		Spec: environmentsv1alpha1.BuildSpec{
-			Image: "docker.io/example/app:latest",
-
+			Image: d.Spec.Image,
 			Strategy: environmentsv1alpha1.Strategy{
-				Kind: "ClusterBuildStrategy",
-				Name: strategy,
+				Kind: string(d.Spec.Strategy.Kind),
+				Name: d.Spec.Strategy.Name,
 			},
-
 			Source: environmentsv1alpha1.GitSource{
-				URL:      "https://github.com/example/repo.git",
-				Revision: "main",
-				Context: "."
+				URL:        d.Spec.Source.URL,
+				Revision:   d.Spec.Source.Revision,
+				Context:    d.Spec.Source.ContextDir,
+				CloneSecret: d.Spec.Source.CloneSecret,
 			},
 			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name: "build-bot",
-				Secret: "docker-registry"
+				Name:   d.Spec.ServiceAccount.Name,
+				Secret: d.Spec.ServiceAccount.Secret,
 			},
 		},
 	}
 }
 
-//
+// validBuild constructs a Build API object from the canonical test data.
+// Uses NewBuildData so all fixtures share the same source of truth.
+func validBuild(name, namespace, strategy string) *environmentsv1alpha1.Build {
+	var d *testdata.BuildData
+	switch strategy {
+	case "buildah-shipwright-managed-push":
+		d = testdata.NewBuildahBuildData(name, namespace)
+	case "buildpacks-v3":
+		d = testdata.NewBuildpacksBuildData(name, namespace)
+	default:
+		// kaniko or any other strategy
+		d = testdata.NewBuildData(name, namespace)
+		d.Spec.Strategy.Name = strategy
+	}
+	return buildFromData(d)
+}
+
 // -----------------------------------------------------------------------------
 // Build Controller Tests
 // -----------------------------------------------------------------------------
 
 var _ = Describe("Build Controller", func() {
 	ctx := context.Background()
+
+	const testNamespace = "default"
 
 	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
@@ -134,14 +151,14 @@ var _ = Describe("Build Controller", func() {
 
 		key := types.NamespacedName{
 			Name:      name,
-			Namespace: "test",
+			Namespace: testNamespace,
 		}
 
 		BeforeEach(func() {
 			build := &environmentsv1alpha1.Build{}
 			if err := k8sClient.Get(ctx, key, build); errors.IsNotFound(err) {
 				Expect(
-					k8sClient.Create(ctx, validBuild(name, "kaniko")),
+					k8sClient.Create(ctx, validBuild(name, testNamespace, "kaniko")),
 				).To(Succeed())
 			}
 		})
@@ -163,7 +180,6 @@ var _ = Describe("Build Controller", func() {
 
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
-
 			Expect(domain.Cmd.GVK.Kind).To(Equal("Build"))
 			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
@@ -204,26 +220,20 @@ var _ = Describe("Build Controller", func() {
 	// -------------------------------------------------------------------------
 
 	Context("Build strategy routing", func() {
-		type testCase struct {
+		type buildTestCase struct {
 			name     string
 			strategy string
-			serviceAccount serviceAccount
-		}
-
-		type serviceAccount struct {
-			name string
-			secret string
 		}
 
 		DescribeTable(
-			"routes Build with correct strategy",
-			func(tc testCase) {
+			"routes Build with correct strategy to the domain",
+			func(tc buildTestCase) {
 				key := types.NamespacedName{
 					Name:      tc.name,
-					Namespace: "default",
+					Namespace: testNamespace,
 				}
 
-				build := validBuild(tc.name, tc.strategy)
+				build := validBuild(tc.name, testNamespace, tc.strategy)
 				Expect(k8sClient.Create(ctx, build)).To(Succeed())
 				DeferCleanup(func() {
 					_ = k8sClient.Delete(ctx, build)
@@ -245,23 +255,45 @@ var _ = Describe("Build Controller", func() {
 
 				buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
 				Expect(ok).To(BeTrue())
-
 				Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
-				//Expect(buildObj.Spec.ServiceAccount.Name).To(Equal(tc.
+				Expect(buildObj.Spec.ServiceAccount.Name).To(Equal("build-bot"))
+				Expect(buildObj.Spec.ServiceAccount.Secret).To(Equal("docker-registry-credentials"))
 			},
 
-			Entry("kaniko", testCase{
+			Entry("kaniko", buildTestCase{
 				name:     "build-kaniko",
 				strategy: "kaniko",
 			}),
-			Entry("buildah", testCase{
+			Entry("buildah", buildTestCase{
 				name:     "build-buildah",
 				strategy: "buildah-shipwright-managed-push",
 			}),
-			Entry("buildpacks", testCase{
+			Entry("buildpacks", buildTestCase{
 				name:     "build-buildpacks",
 				strategy: "buildpacks-v3",
 			}),
 		)
+	})
+
+	// -------------------------------------------------------------------------
+	// NOT FOUND — CR deleted before reconcile loop runs
+	// -------------------------------------------------------------------------
+
+	Context("Build not found", func() {
+		It("returns no error when the Build CR no longer exists", func() {
+			domain := &FakeBuildDomain{}
+			reconciler := newTestReconciler(domain)
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "does-not-exist",
+					Namespace: testNamespace,
+				},
+			})
+
+			Expect(err).NotTo(HaveOccurred())
+			// Domain should not be called — nothing to reconcile
+			Expect(domain.Called).To(BeFalse())
+		})
 	})
 })
