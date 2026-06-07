@@ -1,11 +1,16 @@
 /*
-Copyright 2025.
-
+Copyright 2025 The BlanketOps Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 package environments
@@ -90,19 +95,24 @@ func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
 			Name:      name,
 			Namespace: "default",
 		},
-		// Spec: environmentsv1alpha1.BuildSpec{
-		// 	Image: "docker.io/example/app:latest",
+		Spec: environmentsv1alpha1.BuildSpec{
+			Image: "docker.io/example/app:latest",
 
-		// 	Strategy: environmentsv1alpha1.Strategy{
-		// 		Kind: "ClusterBuildStrategy",
-		// 		Name: strategy,
-		// 	},
+			Strategy: environmentsv1alpha1.Strategy{
+				Kind: "ClusterBuildStrategy",
+				Name: strategy,
+			},
 
-		// 	Source: environmentsv1alpha1.GitSource{
-		// 		URL:      "https://github.com/example/repo.git",
-		// 		Revision: "main",
-		// 	},
-		// },
+			Source: environmentsv1alpha1.GitSource{
+				URL:      "https://github.com/example/repo.git",
+				Revision: "main",
+				Context: "."
+			},
+			ServiceAccount: environmentsv1alpha1.ServiceAccount{
+				Name: "build-bot",
+				Secret: "docker-registry"
+			},
+		},
 	}
 }
 
@@ -123,7 +133,7 @@ var _ = Describe("Build Controller", func() {
 
 		key := types.NamespacedName{
 			Name:      name,
-			Namespace: "default",
+			Namespace: "test",
 		}
 
 		BeforeEach(func() {
@@ -196,6 +206,12 @@ var _ = Describe("Build Controller", func() {
 		type testCase struct {
 			name     string
 			strategy string
+			serviceAccount serviceAccount
+		}
+
+		type serviceAccount struct {
+			name string
+			secret string
 		}
 
 		DescribeTable(
@@ -226,10 +242,11 @@ var _ = Describe("Build Controller", func() {
 				Expect(cmd.GVK.Kind).To(Equal("Build"))
 				Expect(cmd.Type).To(Equal(core.CmdUpdate))
 
-				// buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
-				// Expect(ok).To(BeTrue())
+				buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
+				Expect(ok).To(BeTrue())
 
-				// Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
+				Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
+				//Expect(buildObj.Spec.ServiceAccount.Name).To(Equal(tc.
 			},
 
 			Entry("kaniko", testCase{
