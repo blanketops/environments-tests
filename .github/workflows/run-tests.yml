@@ -1,0 +1,25 @@
+name: Run Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Run on Self Hosted
+    runs-on: self-hosted
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # - name: Running Tests
+      #   run: |
+      #     go mod tidy
+      #     make test
+      # run selected tests or All in selected folder
+      # Attach Report as artifact, maybe to allure?
