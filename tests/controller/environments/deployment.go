@@ -89,28 +89,25 @@ func newTestReconciler(domain *FakeDeploymentDomain) *DeploymentReconciler {
 	}
 }
 
+// Object CR must reference construction from contract, we muust call blanketops-environments
 func validDeployment(name string, strategy string) *environmentsv1alpha1.Deployment {
 	return &environmentsv1alpha1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "default",
+			Namespace: "test",
 		},
 		Spec: environmentsv1alpha1.DeploymentSpec{
-			Image: "docker.io/example/app:latest",
-
-			Strategy: environmentsv1alpha1.Strategy{
-				Kind: "ClusterDeploymentStrategy",
-				Name: strategy,
-			},
-
-			Source: environmentsv1alpha1.GitSource{
-				URL:      "https://github.com/example/repo.git",
-				Revision: "main",
-				Context: "."
-			},
-			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name: "Deployment-bot",
-				Secret: "docker-registry"
+			ServiceUnits: ["for-kaniko-app-api"],
+			Runtime: "kubernetes.io/container-runtime",
+			Strategy: "Rolling",
+			ImageAutomation: false,
+			ReconciliationStrategy: "kustomize",
+			GitOwner: "blanketops",
+			ManifestsRepo: environmentsv1alpha1.ManifestsRepo{
+				Url: "ssh://git@github.com/ntlaletsi70/for-kaniko-app-manifests.git",
+				CloneSecret: "git-ssh-credentials",
+				Strategy: "kustomization",
+				Path:  "./overlays/dev",
 			},
 		},
 	}
