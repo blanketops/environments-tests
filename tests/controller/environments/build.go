@@ -85,10 +85,11 @@ func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
 		Scheme:   k8sClient.Scheme(),
 		Engine:   engine,
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32), // ✅ REQUIRED
+		Recorder: record.NewFakeRecorder(32), // ✅ REQUIRED, add atest tools/events recorder?
 	}
 }
 
+// Object CR must reference construction from contract, we muust call blanketops-environments
 func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
 	return &environmentsv1alpha1.Build{
 		ObjectMeta: metav1.ObjectMeta{
