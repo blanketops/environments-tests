@@ -15,3 +15,19 @@ limitations under the License.
 */
 
 package events
+
+type GitHubEventData struct {
+	Repository string
+	EventType string
+	Refs string
+	Webhook Webhook
+}
+
+type Webhook struct {
+	SecretRef SecretRef
+}
+
+type SecretRef struct {
+	 Name string
+	 Key string 
+}
