@@ -15,3 +15,24 @@ limitations under the License.
 */
 
 package environments
+
+type BuildTriggerData struct {
+
+	Source string
+	EventType string
+	Repository Repository
+	BuildRef BuildRef
+	PayloadPolicy PayloadPolicy
+}
+
+type Repository struct {
+	
+}
+
+type BuildRef struct {
+	
+}
+
+type PayloadPolicy struct {
+	
+}
