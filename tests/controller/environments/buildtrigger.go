@@ -37,7 +37,7 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-// Fake Build Domain (CORRECT seam)
+// Fake BuildTrigger Domain (CORRECT seam)
 // -----------------------------------------------------------------------------
 //
 // This is the ONLY thing we fake.
@@ -85,10 +85,11 @@ func newTestReconciler(domain *FakeBuildTriggerDomain) *BuildTriggerReconciler {
 		Scheme:   k8sClient.Scheme(),
 		Engine:   engine,
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32), // ✅ REQUIRED
+		Recorder: record.NewFakeRecorder(32), // ✅ REQUIRED, add atest tools/events recorder?
 	}
 }
 
+// Object CR must reference construction from contract, we must call blanketops-environments
 func validBuildTrigger(name string, strategy string) *environmentsv1alpha1.BuildTrigger {
 	return &environmentsv1alpha1.BuildTrigger{
 		ObjectMeta: metav1.ObjectMeta{
