@@ -17,6 +17,7 @@ limitations under the License.
 package events
 
 type GitHubEventData struct {
+	Name string
 	Repository string
 	EventType string
 	Refs string
