@@ -32,36 +32,36 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/events/v1alpha1"
+	eventsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/events/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
 )
 
 // -----------------------------------------------------------------------------
-// Fake Build Domain (CORRECT seam)
+// Fake GitHubEvent Domain (CORRECT seam)
 // -----------------------------------------------------------------------------
 //
 // This is the ONLY thing we fake.
 // The controller, registry, engine, and command flow are real.
-type FakeBuildDomain struct {
+type FakeGitHubEventDomain struct {
 	Called bool
 	Cmd    core.Command
 	Err    error
 }
 
-func (f *FakeBuildDomain) CanCreate(obj client.Object) bool { return true }
-func (f *FakeBuildDomain) CanDelete(obj client.Object) bool { return true }
-func (f *FakeBuildDomain) CanUpdate(obj client.Object, old client.Object) bool {
+func (f *FakeGitHubEventDomain) CanCreate(obj client.Object) bool { return true }
+func (f *FakeGitHubEventDomain) CanDelete(obj client.Object) bool { return true }
+func (f *FakeGitHubEventDomain) CanUpdate(obj client.Object, old client.Object) bool {
 	return true
 }
 
-func (f *FakeBuildDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeGitHubEventDomain) Handle(ctx context.Context, cmd core.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
 }
 
-func (f *FakeBuildDomain) GVK() schema.GroupVersionKind {
-	return environmentsv1alpha1.GroupVersion.WithKind("Build")
+func (f *FakeGitHubEventDomain) GVK() schema.GroupVersionKind {
+	return environmentsv1alpha1.GroupVersion.WithKind("GitHubEvent")
 }
 
 var testLogger = logr.Discard()
@@ -71,16 +71,16 @@ var testLogger = logr.Discard()
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
+func newTestReconciler(domain *FakeGitHubEventDomain) *GitHubEventReconciler {
 	registry := core.NewRegistry()
 	registry.RegisterDomain(
-		environmentsv1alpha1.GroupVersion.WithKind("Build"),
+		eventsv1alpha1.GroupVersion.WithKind("GitHubEvent"),
 		domain,
 	)
 
 	engine := core.NewEngine(registry, testLogger)
 
-	return &BuildReconciler{
+	return &GitHubEventReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
 		Engine:   engine,
@@ -89,17 +89,17 @@ func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
 	}
 }
 
-func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
-	return &environmentsv1alpha1.Build{
+func validGitHubEvent(name string, strategy string) *eventsv1alpha1.GitHubEvent {
+	return &eventsv1alpha1.GitHubEvent{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
 		},
-		Spec: environmentsv1alpha1.BuildSpec{
+		Spec: environmentsv1alpha1.GitHubEventSpec{
 			Image: "docker.io/example/app:latest",
 
 			Strategy: environmentsv1alpha1.Strategy{
-				Kind: "ClusterBuildStrategy",
+				Kind: "ClusterGitHubEventStrategy",
 				Name: strategy,
 			},
 
@@ -109,7 +109,7 @@ func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
 				Context: "."
 			},
 			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name: "build-bot",
+				Name: "GitHubEvent-bot",
 				Secret: "docker-registry"
 			},
 		},
@@ -118,10 +118,10 @@ func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
 
 //
 // -----------------------------------------------------------------------------
-// Build Controller Tests
+// GitHubEvent Controller Tests
 // -----------------------------------------------------------------------------
 
-var _ = Describe("Build Controller", func() {
+var _ = Describe("GitHubEvent Controller", func() {
 	ctx := context.Background()
 
 	// -------------------------------------------------------------------------
@@ -129,7 +129,7 @@ var _ = Describe("Build Controller", func() {
 	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
-		const name = "test-build-basic"
+		const name = "test-GitHubEvent-basic"
 
 		key := types.NamespacedName{
 			Name:      name,
@@ -137,23 +137,23 @@ var _ = Describe("Build Controller", func() {
 		}
 
 		BeforeEach(func() {
-			build := &environmentsv1alpha1.Build{}
-			if err := k8sClient.Get(ctx, key, build); errors.IsNotFound(err) {
+			GitHubEvent := &eventsv1alpha1.GitHubEvent{}
+			if err := k8sClient.Get(ctx, key, GitHubEvent); errors.IsNotFound(err) {
 				Expect(
-					k8sClient.Create(ctx, validBuild(name, "kaniko")),
+					k8sClient.Create(ctx, validGitHubEvent(name, "kaniko")),
 				).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			build := &environmentsv1alpha1.Build{}
-			if err := k8sClient.Get(ctx, key, build); err == nil {
-				_ = k8sClient.Delete(ctx, build)
+			GitHubEvent := &eventsv1alpha1.GitHubEvent{}
+			if err := k8sClient.Get(ctx, key, GitHubEvent); err == nil {
+				_ = k8sClient.Delete(ctx, GitHubEvent)
 			}
 		})
 
-		It("routes the Build update through the engine to the Build domain", func() {
-			domain := &FakeBuildDomain{}
+		It("routes the GitHubEvent update through the engine to the GitHubEvent domain", func() {
+			domain := &FakeGitHubEventDomain{}
 			reconciler := newTestReconciler(domain)
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -163,13 +163,13 @@ var _ = Describe("Build Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 
-			Expect(domain.Cmd.GVK.Kind).To(Equal("Build"))
+			Expect(domain.Cmd.GVK.Kind).To(Equal("GitHubEvent"))
 			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
-		It("is idempotent when reconciling the same Build multiple times", func() {
-			domain := &FakeBuildDomain{}
+		It("is idempotent when reconciling the same GitHubEvent multiple times", func() {
+			domain := &FakeGitHubEventDomain{}
 			reconciler := newTestReconciler(domain)
 
 			for i := 0; i < 2; i++ {
@@ -183,9 +183,9 @@ var _ = Describe("Build Controller", func() {
 			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 		})
 
-		It("returns an error when the Build domain fails", func() {
-			domain := &FakeBuildDomain{
-				Err: fmt.Errorf("build domain failure"),
+		It("returns an error when the GitHubEvent domain fails", func() {
+			domain := &FakeGitHubEventDomain{
+				Err: fmt.Errorf("GitHubEvent domain failure"),
 			}
 			reconciler := newTestReconciler(domain)
 
@@ -202,7 +202,7 @@ var _ = Describe("Build Controller", func() {
 	// STRATEGY ROUTING
 	// -------------------------------------------------------------------------
 
-	Context("Build strategy routing", func() {
+	Context("GitHubEvent strategy routing", func() {
 		type testCase struct {
 			name     string
 			strategy string
@@ -215,20 +215,20 @@ var _ = Describe("Build Controller", func() {
 		}
 
 		DescribeTable(
-			"routes Build with correct strategy",
+			"routes GitHubEvent with correct strategy",
 			func(tc testCase) {
 				key := types.NamespacedName{
 					Name:      tc.name,
 					Namespace: "default",
 				}
 
-				build := validBuild(tc.name, tc.strategy)
-				Expect(k8sClient.Create(ctx, build)).To(Succeed())
+				GitHubEvent := validGitHubEvent(tc.name, tc.strategy)
+				Expect(k8sClient.Create(ctx, GitHubEvent)).To(Succeed())
 				DeferCleanup(func() {
-					_ = k8sClient.Delete(ctx, build)
+					_ = k8sClient.Delete(ctx, GitHubEvent)
 				})
 
-				domain := &FakeBuildDomain{}
+				domain := &FakeGitHubEventDomain{}
 				reconciler := newTestReconciler(domain)
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -239,27 +239,27 @@ var _ = Describe("Build Controller", func() {
 				Expect(domain.Called).To(BeTrue())
 
 				cmd := domain.Cmd
-				Expect(cmd.GVK.Kind).To(Equal("Build"))
+				Expect(cmd.GVK.Kind).To(Equal("GitHubEvent"))
 				Expect(cmd.Type).To(Equal(core.CmdUpdate))
 
-				buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
+				GitHubEventObj, ok := cmd.Obj.(*environmentsv1alpha1.GitHubEvent)
 				Expect(ok).To(BeTrue())
 
-				Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
-				//Expect(buildObj.Spec.ServiceAccount.Name).To(Equal(tc.
+				Expect(GitHubEventObj.Spec.Strategy.Name).To(Equal(tc.strategy))
+				//Expect(GitHubEventObj.Spec.ServiceAccount.Name).To(Equal(tc.
 			},
 
 			Entry("kaniko", testCase{
-				name:     "build-kaniko",
+				name:     "GitHubEvent-kaniko",
 				strategy: "kaniko",
 			}),
-			Entry("buildah", testCase{
-				name:     "build-buildah",
-				strategy: "buildah-shipwright-managed-push",
+			Entry("GitHubEventah", testCase{
+				name:     "GitHubEvent-GitHubEventah",
+				strategy: "GitHubEventah-shipwright-managed-push",
 			}),
-			Entry("buildpacks", testCase{
-				name:     "build-buildpacks",
-				strategy: "buildpacks-v3",
+			Entry("GitHubEventpacks", testCase{
+				name:     "GitHubEvent-GitHubEventpacks",
+				strategy: "GitHubEventpacks-v3",
 			}),
 		)
 	})
