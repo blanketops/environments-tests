@@ -15,3 +15,22 @@ limitations under the License.
 */
 
 package environments
+
+type BuildData struct {
+	Name string
+	Strategy Strategy
+	Source Source
+	ServiceAccount ServiceAccount
+}
+
+type ServiceAccount struct{
+	
+}
+
+type Source struct {
+	
+}
+
+type Strate struct {
+	
+}

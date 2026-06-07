@@ -15,3 +15,12 @@ limitations under the License.
 */
 
 package networks
+
+type RouteData struct {
+	Name string
+	Host string
+	TLSEnabled bool
+	Path string
+	Enabled bool
+	Runtime string
+}

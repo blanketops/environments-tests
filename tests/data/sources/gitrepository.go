@@ -16,7 +16,7 @@ limitations under the License.
 package sources
 
 type GitRepositoryData struct {
-   
+   Name string
    Provider string
    HookUrl string
    Repository Repository
@@ -24,18 +24,15 @@ type GitRepositoryData struct {
 }
 
 type Repository struct {
-	
   Owner string
   Name string
 }
 
 type Webhooks struct {
-	
   Events[] Events
 }
 
 type Events struct {
-	
   Event string
 }
 // Initialize object here?, 
