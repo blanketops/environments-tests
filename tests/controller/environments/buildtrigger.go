@@ -71,7 +71,7 @@ var testLogger = logr.Discard()
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newTestReconciler(domain *FakeBuildTriggerDomain) *BuildReconciler {
+func newTestReconciler(domain *FakeBuildTriggerDomain) *BuildTriggerReconciler {
 	registry := core.NewRegistry()
 	registry.RegisterDomain(
 		environmentsv1alpha1.GroupVersion.WithKind("BuildTrigger"),
@@ -93,24 +93,21 @@ func validBuildTrigger(name string, strategy string) *environmentsv1alpha1.Build
 	return &environmentsv1alpha1.BuildTrigger{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "default",
+			Namespace: "test",
 		},
-		Spec: environmentsv1alpha1.BuildSpec{
-			Image: "docker.io/example/app:latest",
-
-			Strategy: environmentsv1alpha1.Strategy{
-				Kind: "ClusterBuildStrategy",
-				Name: strategy,
+		Spec: environmentsv1alpha1.BuildTriggerSpec{
+			Source: "github",
+			EventType: "push",
+			Repository: environmentsv1alpha1.Repository{
+				Owner: "ntlaletsi70",
+				Name: "blanketops"
 			},
-
-			Source: environmentsv1alpha1.GitSource{
-				URL:      "https://github.com/example/repo.git",
-				Revision: "main",
-				Context: "."
+			Refs: " refs/heads/master",
+			BuildRef: environments.BuildRef{
+				Name: "for-kaniko-app"
 			},
-			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name: "build-bot",
-				Secret: "docker-registry"
+			PayloadPolicy: environmentsv1alpha1.PayloadPolicy{
+				Allow: true
 			},
 		},
 	}
