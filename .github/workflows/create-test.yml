@@ -1,0 +1,25 @@
+name: Create Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Run on Self Hosted
+    runs-on: self-hosted
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # - name: Running Tests
+      #   run: |
+      #     go mod tidy
+      #     make test
+      # use gh api or action to create test issue from list of test files, 
+      #or after merge to main when no such issue exists
