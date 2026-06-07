@@ -1,25 +1,99 @@
-name: Create Test
+name: Create Test Issues
 
 on:
   push:
-  pull_request:
+    branches:
+    - main
+  workflow_dispatch:
+
 
 jobs:
-  test:
-    name: Run on Self Hosted
+  create-issues:
+    name: Create issues from test files
     runs-on: self-hosted
+    permissions:
+      issues: write
+      contents: read
+
     steps:
-      - name: Clone the code
-        uses: actions/checkout@v4
+    - name: Clone the code
+      uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
 
-      # - name: Running Tests
-      #   run: |
-      #     go mod tidy
-      #     make test
-      # use gh api or action to create test issue from list of test files, 
-      #or after merge to main when no such issue exists
+    - name: Create test tracking issues
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPO: ${{ github.repository }}
+      run: |
+        # For each test file — create a tracking issue if one does not exist.
+        # Issue title format: [test] <package>/<filename>
+        # Label: test-tracking
+        # Only creates — never duplicates.
+
+        # Ensure label exists
+        gh label create "test-tracking" \
+          --color "0075ca" \
+          --description "Tracks test file coverage and wiring status" \
+          --repo "$REPO" 2>/dev/null || true
+
+        gh label create "grpc" \
+          --color "e4e669" \
+          --description "gRPC test" \
+          --repo "$REPO" 2>/dev/null || true
+
+        gh label create "fake" \
+          --color "d93f0b" \
+          --description "Fake domain controller test" \
+          --repo "$REPO" 2>/dev/null || true
+
+        # Find all test files
+        find tests/ -name "*.go" | sort | while read -r file; do
+          pkg=$(dirname "$file" | sed 's|tests/||')
+          filename=$(basename "$file" .go)
+          title="[test] ${pkg}/${filename}"
+
+          # Check if issue already exists
+          existing=$(gh issue list \
+            --repo "$REPO" \
+            --label "test-tracking" \
+            --search "\"$title\" in:title" \
+            --json number \
+            --jq '.[0].number' 2>/dev/null)
+
+          if [ -n "$existing" ]; then
+            echo "Issue already exists for $title (#$existing) — skipping"
+            continue
+          fi
+
+          # Determine labels based on path
+          labels="test-tracking"
+          echo "$file" | grep -q "grpc"  && labels="$labels,grpc"
+          echo "$file" | grep -q "fake"  && labels="$labels,fake"
+          echo "$file" | grep -q "data"  && labels="$labels,data"
+
+          # Build issue body
+          body="## Test File: \`${file}\`
+            **Package:** \`${pkg}\`
+            **File:** \`${filename}\`
+            **Commit:** ${{ github.sha }}
+
+            ### Status
+            - [ ] Compiles
+            - [ ] t.Skip removed / test wired
+            - [ ] Passes on self-hosted runner
+            - [ ] Passes in CI
+            ### Notes
+            _Add wiring notes, blockers, or context here._"
+
+          gh issue create \
+            --repo "$REPO" \
+            --title "$title" \
+            --body "$body" \
+            --label "$labels" \
+            && echo "Created issue: $title" \
+            || echo "Failed to create issue: $title"
+        done

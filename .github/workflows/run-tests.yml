@@ -3,23 +3,99 @@ name: Run Tests
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      test_path:
+        description: "Path to test (e.g. ./tests/fake/environments/... or ./tests/grpc/...)"
+        required: false
+        default: "./tests/..."
+      test_run:
+        description: "Filter by test name (e.g. TestBuildService or Build)"
+        required: false
+        default: ""
 
 jobs:
   test:
     name: Run on Self Hosted
     runs-on: self-hosted
+    permissions:
+      contents: read
+      checks: write
+
     steps:
-      - name: Clone the code
-        uses: actions/checkout@v4
+    - name: Clone the code
+      uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
 
-      # - name: Running Tests
-      #   run: |
-      #     go mod tidy
-      #     make test
-      # run selected tests or All in selected folder
-      # Attach Report as artifact, maybe to allure?
+    - name: Tidy dependencies
+      run: go mod tidy
+
+    - name: Resolve test path
+      id: resolve
+      run: |
+        # Use workflow_dispatch input if provided, else run all tests
+        TEST_PATH="${{ github.event.inputs.test_path }}"
+        TEST_RUN="${{ github.event.inputs.test_run }}"
+
+        if [ -z "$TEST_PATH" ]; then
+          TEST_PATH="./tests/..."
+        fi
+
+        echo "test_path=$TEST_PATH" >> "$GITHUB_OUTPUT"
+        echo "test_run=$TEST_RUN"   >> "$GITHUB_OUTPUT"
+        echo "Running: $TEST_PATH ${TEST_RUN:+-run $TEST_RUN}"
+
+    - name: Run tests
+      run: |
+        TEST_PATH="${{ steps.resolve.outputs.test_path }}"
+        TEST_RUN="${{ steps.resolve.outputs.test_run }}"
+
+        mkdir -p reports
+
+        RUN_FLAG=""
+        if [ -n "$TEST_RUN" ]; then
+          RUN_FLAG="-run $TEST_RUN"
+        fi
+
+        go test \
+          $TEST_PATH \
+          $RUN_FLAG \
+          -v \
+          -count=1 \
+          -timeout 10m \
+          -json \
+          2>&1 | tee reports/test-output.json
+
+        # Exit code from go test — not tee
+        exit "${PIPESTATUS[0]}"
+
+    - name: Convert to JUnit XML
+      if: always()
+      run: |
+        # go-junit-report converts go test -json to JUnit XML for artifact upload
+        go install github.com/jstemmer/go-junit-report/v2@latest
+        cat reports/test-output.json \
+          | go-junit-report -parser gojson \
+          > reports/junit.xml
+        echo "JUnit report written to reports/junit.xml"
+
+    - name: Upload test report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-report-${{ github.run_number }}
+        path: reports/
+        retention-days: 30
+
+    - name: Publish test results
+      if: always()
+      uses: dorny/test-reporter@v1
+      with:
+        name: "Test Results"
+        path: reports/junit.xml
+        reporter: java-junit
+        fail-on-error: false
