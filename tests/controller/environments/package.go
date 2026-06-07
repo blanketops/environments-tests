@@ -37,31 +37,31 @@ import (
 )
 
 // -----------------------------------------------------------------------------
-// Fake Build Domain (CORRECT seam)
+// Fake Package Domain (CORRECT seam)
 // -----------------------------------------------------------------------------
 //
 // This is the ONLY thing we fake.
 // The controller, registry, engine, and command flow are real.
-type FakeBuildDomain struct {
+type FakePackageDomain struct {
 	Called bool
 	Cmd    core.Command
 	Err    error
 }
 
-func (f *FakeBuildDomain) CanCreate(obj client.Object) bool { return true }
-func (f *FakeBuildDomain) CanDelete(obj client.Object) bool { return true }
-func (f *FakeBuildDomain) CanUpdate(obj client.Object, old client.Object) bool {
+func (f *FakePackageDomain) CanCreate(obj client.Object) bool { return true }
+func (f *FakePackageDomain) CanDelete(obj client.Object) bool { return true }
+func (f *FakePackageDomain) CanUpdate(obj client.Object, old client.Object) bool {
 	return true
 }
 
-func (f *FakeBuildDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakePackageDomain) Handle(ctx context.Context, cmd core.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
 }
 
-func (f *FakeBuildDomain) GVK() schema.GroupVersionKind {
-	return environmentsv1alpha1.GroupVersion.WithKind("Build")
+func (f *FakePackageDomain) GVK() schema.GroupVersionKind {
+	return environmentsv1alpha1.GroupVersion.WithKind("Package")
 }
 
 var testLogger = logr.Discard()
@@ -71,16 +71,16 @@ var testLogger = logr.Discard()
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
+func newTestReconciler(domain *FakePackageDomain) *PackageReconciler {
 	registry := core.NewRegistry()
 	registry.RegisterDomain(
-		environmentsv1alpha1.GroupVersion.WithKind("Build"),
+		environmentsv1alpha1.GroupVersion.WithKind("Package"),
 		domain,
 	)
 
 	engine := core.NewEngine(registry, testLogger)
 
-	return &BuildReconciler{
+	return &PackageReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
 		Engine:   engine,
@@ -89,17 +89,17 @@ func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
 	}
 }
 
-func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
-	return &environmentsv1alpha1.Build{
+func validPackage(name string, strategy string) *environmentsv1alpha1.Package {
+	return &environmentsv1alpha1.Package{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
 		},
-		Spec: environmentsv1alpha1.BuildSpec{
+		Spec: environmentsv1alpha1.PackageSpec{
 			Image: "docker.io/example/app:latest",
 
 			Strategy: environmentsv1alpha1.Strategy{
-				Kind: "ClusterBuildStrategy",
+				Kind: "ClusterPackageStrategy",
 				Name: strategy,
 			},
 
@@ -109,7 +109,7 @@ func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
 				Context: "."
 			},
 			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name: "build-bot",
+				Name: "Package-bot",
 				Secret: "docker-registry"
 			},
 		},
@@ -118,10 +118,10 @@ func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
 
 //
 // -----------------------------------------------------------------------------
-// Build Controller Tests
+// Package Controller Tests
 // -----------------------------------------------------------------------------
 
-var _ = Describe("Build Controller", func() {
+var _ = Describe("Package Controller", func() {
 	ctx := context.Background()
 
 	// -------------------------------------------------------------------------
@@ -129,7 +129,7 @@ var _ = Describe("Build Controller", func() {
 	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
-		const name = "test-build-basic"
+		const name = "test-Package-basic"
 
 		key := types.NamespacedName{
 			Name:      name,
@@ -137,23 +137,23 @@ var _ = Describe("Build Controller", func() {
 		}
 
 		BeforeEach(func() {
-			build := &environmentsv1alpha1.Build{}
-			if err := k8sClient.Get(ctx, key, build); errors.IsNotFound(err) {
+			Package := &environmentsv1alpha1.Package{}
+			if err := k8sClient.Get(ctx, key, Package); errors.IsNotFound(err) {
 				Expect(
-					k8sClient.Create(ctx, validBuild(name, "kaniko")),
+					k8sClient.Create(ctx, validPackage(name, "kaniko")),
 				).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			build := &environmentsv1alpha1.Build{}
-			if err := k8sClient.Get(ctx, key, build); err == nil {
-				_ = k8sClient.Delete(ctx, build)
+			Package := &environmentsv1alpha1.Package{}
+			if err := k8sClient.Get(ctx, key, Package); err == nil {
+				_ = k8sClient.Delete(ctx, Package)
 			}
 		})
 
-		It("routes the Build update through the engine to the Build domain", func() {
-			domain := &FakeBuildDomain{}
+		It("routes the Package update through the engine to the Package domain", func() {
+			domain := &FakePackageDomain{}
 			reconciler := newTestReconciler(domain)
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -163,13 +163,13 @@ var _ = Describe("Build Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 
-			Expect(domain.Cmd.GVK.Kind).To(Equal("Build"))
+			Expect(domain.Cmd.GVK.Kind).To(Equal("Package"))
 			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
-		It("is idempotent when reconciling the same Build multiple times", func() {
-			domain := &FakeBuildDomain{}
+		It("is idempotent when reconciling the same Package multiple times", func() {
+			domain := &FakePackageDomain{}
 			reconciler := newTestReconciler(domain)
 
 			for i := 0; i < 2; i++ {
@@ -183,9 +183,9 @@ var _ = Describe("Build Controller", func() {
 			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 		})
 
-		It("returns an error when the Build domain fails", func() {
-			domain := &FakeBuildDomain{
-				Err: fmt.Errorf("build domain failure"),
+		It("returns an error when the Package domain fails", func() {
+			domain := &FakePackageDomain{
+				Err: fmt.Errorf("Package domain failure"),
 			}
 			reconciler := newTestReconciler(domain)
 
@@ -202,7 +202,7 @@ var _ = Describe("Build Controller", func() {
 	// STRATEGY ROUTING
 	// -------------------------------------------------------------------------
 
-	Context("Build strategy routing", func() {
+	Context("Package strategy routing", func() {
 		type testCase struct {
 			name     string
 			strategy string
@@ -215,20 +215,20 @@ var _ = Describe("Build Controller", func() {
 		}
 
 		DescribeTable(
-			"routes Build with correct strategy",
+			"routes Package with correct strategy",
 			func(tc testCase) {
 				key := types.NamespacedName{
 					Name:      tc.name,
 					Namespace: "default",
 				}
 
-				build := validBuild(tc.name, tc.strategy)
-				Expect(k8sClient.Create(ctx, build)).To(Succeed())
+				Package := validPackage(tc.name, tc.strategy)
+				Expect(k8sClient.Create(ctx, Package)).To(Succeed())
 				DeferCleanup(func() {
-					_ = k8sClient.Delete(ctx, build)
+					_ = k8sClient.Delete(ctx, Package)
 				})
 
-				domain := &FakeBuildDomain{}
+				domain := &FakePackageDomain{}
 				reconciler := newTestReconciler(domain)
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -239,27 +239,27 @@ var _ = Describe("Build Controller", func() {
 				Expect(domain.Called).To(BeTrue())
 
 				cmd := domain.Cmd
-				Expect(cmd.GVK.Kind).To(Equal("Build"))
+				Expect(cmd.GVK.Kind).To(Equal("Package"))
 				Expect(cmd.Type).To(Equal(core.CmdUpdate))
 
-				buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
+				PackageObj, ok := cmd.Obj.(*environmentsv1alpha1.Package)
 				Expect(ok).To(BeTrue())
 
-				Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
-				//Expect(buildObj.Spec.ServiceAccount.Name).To(Equal(tc.
+				Expect(PackageObj.Spec.Strategy.Name).To(Equal(tc.strategy))
+				//Expect(PackageObj.Spec.ServiceAccount.Name).To(Equal(tc.
 			},
 
 			Entry("kaniko", testCase{
-				name:     "build-kaniko",
+				name:     "Package-kaniko",
 				strategy: "kaniko",
 			}),
-			Entry("buildah", testCase{
-				name:     "build-buildah",
-				strategy: "buildah-shipwright-managed-push",
+			Entry("Packageah", testCase{
+				name:     "Package-Packageah",
+				strategy: "Packageah-shipwright-managed-push",
 			}),
-			Entry("buildpacks", testCase{
-				name:     "build-buildpacks",
-				strategy: "buildpacks-v3",
+			Entry("Packagepacks", testCase{
+				name:     "Package-Packagepacks",
+				strategy: "Packagepacks-v3",
 			}),
 		)
 	})
