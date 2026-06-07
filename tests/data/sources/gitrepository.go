@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package environments
+package sources
 
-type GitRepositoryData struct{
+type GitRepositoryData struct {
    
    Provider string
    HookUrl string
@@ -24,14 +24,18 @@ type GitRepositoryData struct{
 }
 
 type Repository struct {
+	
   Owner string
   Name string
 }
 
 type Webhooks struct {
+	
   Events[] Events
 }
 
-type Events struct{
+type Events struct {
+	
   Event string
 }
+// Initialize object here?, 
