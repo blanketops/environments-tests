@@ -32,36 +32,36 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1alpha1"
+	sourcesv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/sources/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
 )
 
 // -----------------------------------------------------------------------------
-// Fake Build Domain (CORRECT seam)
+// Fake GitRepository Domain (CORRECT seam)
 // -----------------------------------------------------------------------------
 //
 // This is the ONLY thing we fake.
 // The controller, registry, engine, and command flow are real.
-type FakeBuildDomain struct {
+type FakeGitRepositoryDomain struct {
 	Called bool
 	Cmd    core.Command
 	Err    error
 }
 
-func (f *FakeBuildDomain) CanCreate(obj client.Object) bool { return true }
-func (f *FakeBuildDomain) CanDelete(obj client.Object) bool { return true }
-func (f *FakeBuildDomain) CanUpdate(obj client.Object, old client.Object) bool {
+func (f *FakeGitRepositoryDomain) CanCreate(obj client.Object) bool { return true }
+func (f *FakeGitRepositoryDomain) CanDelete(obj client.Object) bool { return true }
+func (f *FakeGitRepositoryDomain) CanUpdate(obj client.Object, old client.Object) bool {
 	return true
 }
 
-func (f *FakeBuildDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeGitRepositoryDomain) Handle(ctx context.Context, cmd core.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
 }
 
-func (f *FakeBuildDomain) GVK() schema.GroupVersionKind {
-	return environmentsv1alpha1.GroupVersion.WithKind("Build")
+func (f *FakeGitRepositoryDomain) GVK() schema.GroupVersionKind {
+	return sourcesv1alpha1.GroupVersion.WithKind("GitRepository")
 }
 
 var testLogger = logr.Discard()
@@ -71,16 +71,16 @@ var testLogger = logr.Discard()
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
+func newTestReconciler(domain *FakeGitRepositoryDomain) *GitRepositoryReconciler {
 	registry := core.NewRegistry()
 	registry.RegisterDomain(
-		environmentsv1alpha1.GroupVersion.WithKind("Build"),
+		sourcesv1alpha1.GroupVersion.WithKind("GitRepository"),
 		domain,
 	)
 
 	engine := core.NewEngine(registry, testLogger)
 
-	return &BuildReconciler{
+	return &GitRepositoryReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
 		Engine:   engine,
@@ -89,27 +89,27 @@ func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
 	}
 }
 
-func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
-	return &environmentsv1alpha1.Build{
+func validGitRepository(name string, strategy string) *sourcesv1alpha1.GitRepository {
+	return &sourcesv1alpha1.GitRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
 		},
-		Spec: environmentsv1alpha1.BuildSpec{
+		Spec: sourcesv1alpha1.GitRepositorySpec{
 			Image: "docker.io/example/app:latest",
 
-			Strategy: environmentsv1alpha1.Strategy{
-				Kind: "ClusterBuildStrategy",
+			Strategy: sourcesv1alpha1.Strategy{
+				Kind: "ClusterGitRepositoryStrategy",
 				Name: strategy,
 			},
 
-			Source: environmentsv1alpha1.GitSource{
+			Source: sourcesv1alpha1.GitSource{
 				URL:      "https://github.com/example/repo.git",
 				Revision: "main",
 				Context: "."
 			},
-			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name: "build-bot",
+			ServiceAccount: sourcesv1alpha1.ServiceAccount{
+				Name: "GitRepository-bot",
 				Secret: "docker-registry"
 			},
 		},
@@ -118,10 +118,10 @@ func validBuild(name string, strategy string) *environmentsv1alpha1.Build {
 
 //
 // -----------------------------------------------------------------------------
-// Build Controller Tests
+// GitRepository Controller Tests
 // -----------------------------------------------------------------------------
 
-var _ = Describe("Build Controller", func() {
+var _ = Describe("GitRepository Controller", func() {
 	ctx := context.Background()
 
 	// -------------------------------------------------------------------------
@@ -129,7 +129,7 @@ var _ = Describe("Build Controller", func() {
 	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
-		const name = "test-build-basic"
+		const name = "test-GitRepository-basic"
 
 		key := types.NamespacedName{
 			Name:      name,
@@ -137,23 +137,23 @@ var _ = Describe("Build Controller", func() {
 		}
 
 		BeforeEach(func() {
-			build := &environmentsv1alpha1.Build{}
-			if err := k8sClient.Get(ctx, key, build); errors.IsNotFound(err) {
+			GitRepository := &sourcesv1alpha1.GitRepository{}
+			if err := k8sClient.Get(ctx, key, GitRepository); errors.IsNotFound(err) {
 				Expect(
-					k8sClient.Create(ctx, validBuild(name, "kaniko")),
+					k8sClient.Create(ctx, validGitRepository(name, "kaniko")),
 				).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			build := &environmentsv1alpha1.Build{}
-			if err := k8sClient.Get(ctx, key, build); err == nil {
-				_ = k8sClient.Delete(ctx, build)
+			GitRepository := &sourcesv1alpha1.GitRepository{}
+			if err := k8sClient.Get(ctx, key, GitRepository); err == nil {
+				_ = k8sClient.Delete(ctx, GitRepository)
 			}
 		})
 
-		It("routes the Build update through the engine to the Build domain", func() {
-			domain := &FakeBuildDomain{}
+		It("routes the GitRepository update through the engine to the GitRepository domain", func() {
+			domain := &FakeGitRepositoryDomain{}
 			reconciler := newTestReconciler(domain)
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -163,13 +163,13 @@ var _ = Describe("Build Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 
-			Expect(domain.Cmd.GVK.Kind).To(Equal("Build"))
+			Expect(domain.Cmd.GVK.Kind).To(Equal("GitRepository"))
 			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
-		It("is idempotent when reconciling the same Build multiple times", func() {
-			domain := &FakeBuildDomain{}
+		It("is idempotent when reconciling the same GitRepository multiple times", func() {
+			domain := &FakeGitRepositoryDomain{}
 			reconciler := newTestReconciler(domain)
 
 			for i := 0; i < 2; i++ {
@@ -183,9 +183,9 @@ var _ = Describe("Build Controller", func() {
 			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 		})
 
-		It("returns an error when the Build domain fails", func() {
-			domain := &FakeBuildDomain{
-				Err: fmt.Errorf("build domain failure"),
+		It("returns an error when the GitRepository domain fails", func() {
+			domain := &FakeGitRepositoryDomain{
+				Err: fmt.Errorf("GitRepository domain failure"),
 			}
 			reconciler := newTestReconciler(domain)
 
@@ -202,7 +202,7 @@ var _ = Describe("Build Controller", func() {
 	// STRATEGY ROUTING
 	// -------------------------------------------------------------------------
 
-	Context("Build strategy routing", func() {
+	Context("GitRepository strategy routing", func() {
 		type testCase struct {
 			name     string
 			strategy string
@@ -215,20 +215,20 @@ var _ = Describe("Build Controller", func() {
 		}
 
 		DescribeTable(
-			"routes Build with correct strategy",
+			"routes GitRepository with correct strategy",
 			func(tc testCase) {
 				key := types.NamespacedName{
 					Name:      tc.name,
 					Namespace: "default",
 				}
 
-				build := validBuild(tc.name, tc.strategy)
-				Expect(k8sClient.Create(ctx, build)).To(Succeed())
+				GitRepository := validGitRepository(tc.name, tc.strategy)
+				Expect(k8sClient.Create(ctx, GitRepository)).To(Succeed())
 				DeferCleanup(func() {
-					_ = k8sClient.Delete(ctx, build)
+					_ = k8sClient.Delete(ctx, GitRepository)
 				})
 
-				domain := &FakeBuildDomain{}
+				domain := &FakeGitRepositoryDomain{}
 				reconciler := newTestReconciler(domain)
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -239,27 +239,27 @@ var _ = Describe("Build Controller", func() {
 				Expect(domain.Called).To(BeTrue())
 
 				cmd := domain.Cmd
-				Expect(cmd.GVK.Kind).To(Equal("Build"))
+				Expect(cmd.GVK.Kind).To(Equal("GitRepository"))
 				Expect(cmd.Type).To(Equal(core.CmdUpdate))
 
-				buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
+				GitRepositoryObj, ok := cmd.Obj.(*sourcesv1alpha1.GitRepository)
 				Expect(ok).To(BeTrue())
 
-				Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
-				//Expect(buildObj.Spec.ServiceAccount.Name).To(Equal(tc.
+				Expect(GitRepositoryObj.Spec.Strategy.Name).To(Equal(tc.strategy))
+				//Expect(GitRepositoryObj.Spec.ServiceAccount.Name).To(Equal(tc.
 			},
 
 			Entry("kaniko", testCase{
-				name:     "build-kaniko",
+				name:     "GitRepository-kaniko",
 				strategy: "kaniko",
 			}),
-			Entry("buildah", testCase{
-				name:     "build-buildah",
-				strategy: "buildah-shipwright-managed-push",
+			Entry("GitRepositoryah", testCase{
+				name:     "GitRepository-GitRepositoryah",
+				strategy: "GitRepositoryah-shipwright-managed-push",
 			}),
-			Entry("buildpacks", testCase{
-				name:     "build-buildpacks",
-				strategy: "buildpacks-v3",
+			Entry("GitRepositorypacks", testCase{
+				name:     "GitRepository-GitRepositorypacks",
+				strategy: "GitRepositorypacks-v3",
 			}),
 		)
 	})
