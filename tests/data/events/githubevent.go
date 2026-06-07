@@ -32,3 +32,4 @@ type SecretRef struct {
 	 Name string
 	 Key string 
 }
+// Initialize object here?, 
