@@ -16,6 +16,7 @@ limitations under the License.
 package sources
 
 type GitRepositoryData struct {
+   Name string
    Provider string
    HookUrl string
    Repository Repository
