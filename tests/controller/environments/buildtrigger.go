@@ -1,11 +1,10 @@
 /*
-Copyright 2025.
-
+Copyright 2025 The BlanketOps Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,67 +17,250 @@ package environments
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
+
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1alpha1"
+	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
 )
 
+// -----------------------------------------------------------------------------
+// Fake Build Domain (CORRECT seam)
+// -----------------------------------------------------------------------------
+//
+// This is the ONLY thing we fake.
+// The controller, registry, engine, and command flow are real.
+type FakeBuildTriggerDomain struct {
+	Called bool
+	Cmd    core.Command
+	Err    error
+}
+
+func (f *FakeBuildTriggerDomain) CanCreate(obj client.Object) bool { return true }
+func (f *FakeBuildTriggerDomain) CanDelete(obj client.Object) bool { return true }
+func (f *FakeBuildTriggerDomain) CanUpdate(obj client.Object, old client.Object) bool {
+	return true
+}
+
+func (f *FakeBuildTriggerDomain) Handle(ctx context.Context, cmd core.Command) error {
+	f.Called = true
+	f.Cmd = cmd
+	return f.Err
+}
+
+func (f *FakeBuildTriggerDomain) GVK() schema.GroupVersionKind {
+	return environmentsv1alpha1.GroupVersion.WithKind("BuildTrigger")
+}
+
+var testLogger = logr.Discard()
+
+//
+// -----------------------------------------------------------------------------
+// Test helpers
+// -----------------------------------------------------------------------------
+
+func newTestReconciler(domain *FakeBuildTriggerDomain) *BuildReconciler {
+	registry := core.NewRegistry()
+	registry.RegisterDomain(
+		environmentsv1alpha1.GroupVersion.WithKind("BuildTrigger"),
+		domain,
+	)
+
+	engine := core.NewEngine(registry, testLogger)
+
+	return &BuildTriggerReconciler{
+		Client:   k8sClient,
+		Scheme:   k8sClient.Scheme(),
+		Engine:   engine,
+		Log:      testLogger,
+		Recorder: record.NewFakeRecorder(32), // ✅ REQUIRED
+	}
+}
+
+func validBuildTrigger(name string, strategy string) *environmentsv1alpha1.BuildTrigger {
+	return &environmentsv1alpha1.BuildTrigger{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+		},
+		Spec: environmentsv1alpha1.BuildSpec{
+			Image: "docker.io/example/app:latest",
+
+			Strategy: environmentsv1alpha1.Strategy{
+				Kind: "ClusterBuildStrategy",
+				Name: strategy,
+			},
+
+			Source: environmentsv1alpha1.GitSource{
+				URL:      "https://github.com/example/repo.git",
+				Revision: "main",
+				Context: "."
+			},
+			ServiceAccount: environmentsv1alpha1.ServiceAccount{
+				Name: "build-bot",
+				Secret: "docker-registry"
+			},
+		},
+	}
+}
+
+//
+// -----------------------------------------------------------------------------
+// BuildTrigger Controller Tests
+// -----------------------------------------------------------------------------
+
 var _ = Describe("BuildTrigger Controller", func() {
-	Context("When reconciling a resource", func() {
-		const resourceName = "test-resource"
+	ctx := context.Background()
 
-		ctx := context.Background()
+	// -------------------------------------------------------------------------
+	// BASIC BEHAVIOUR
+	// -------------------------------------------------------------------------
 
-		typeNamespacedName := types.NamespacedName{
-			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+	Context("Basic reconciliation behaviour", func() {
+		const name = "test-buildtrigger-basic"
+
+		key := types.NamespacedName{
+			Name:      name,
+			Namespace: "test",
 		}
-		buildtrigger := &environmentsv1alpha1.BuildTrigger{}
 
 		BeforeEach(func() {
-			By("creating the custom resource for the Kind BuildTrigger")
-			err := k8sClient.Get(ctx, typeNamespacedName, buildtrigger)
-			if err != nil && errors.IsNotFound(err) {
-				resource := &environmentsv1alpha1.BuildTrigger{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      resourceName,
-						Namespace: "default",
-					},
-					// TODO(user): Specify other spec details if needed.
-				}
-				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			build := &environmentsv1alpha1.BuildTrigger{}
+			if err := k8sClient.Get(ctx, key, BuildTrigger); errors.IsNotFound(err) {
+				Expect(
+					k8sClient.Create(ctx, validBuildTrigger(name, "kaniko")),
+				).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &environmentsv1alpha1.BuildTrigger{}
-			err := k8sClient.Get(ctx, typeNamespacedName, resource)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Cleanup the specific resource instance BuildTrigger")
-			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+			build := &environmentsv1alpha1.BuildTrigger{}
+			if err := k8sClient.Get(ctx, key, buildTrigger); err == nil {
+				_ = k8sClient.Delete(ctx, buildTrigger)
+			}
 		})
-		It("should successfully reconcile the resource", func() {
-			By("Reconciling the created resource")
-			controllerReconciler := &BuildTriggerReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+
+		It("routes the BuildTrigger update through the engine to the BuildTrigger domain", func() {
+			domain := &FakeBuildTriggerDomain{}
+			reconciler := newTestReconciler(domain)
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: key,
+			})
+
+			Expect(err).NotTo(HaveOccurred())
+			Expect(domain.Called).To(BeTrue())
+
+			Expect(domain.Cmd.GVK.Kind).To(Equal("BuildTrigger"))
+			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Obj).NotTo(BeNil())
+		})
+
+		It("is idempotent when reconciling the same BuildTrigger multiple times", func() {
+			domain := &FakeBuildTriggerDomain{}
+			reconciler := newTestReconciler(domain)
+
+			for i := 0; i < 2; i++ {
+				_, err := reconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: key,
+				})
+				Expect(err).NotTo(HaveOccurred())
 			}
 
-			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+			Expect(domain.Called).To(BeTrue())
+			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
 		})
+
+		It("returns an error when the BuildTrigger domain fails", func() {
+			domain := &FakeBuildTriggerDomain{
+				Err: fmt.Errorf("build domain failure"),
+			}
+			reconciler := newTestReconciler(domain)
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: key,
+			})
+
+			Expect(err).To(HaveOccurred())
+			Expect(domain.Called).To(BeTrue())
+		})
+	})
+
+	// -------------------------------------------------------------------------
+	// STRATEGY ROUTING
+	// -------------------------------------------------------------------------
+
+	Context("BuildTrigger strategy routing", func() {
+		type testCase struct {
+			name     string
+			strategy string
+			serviceAccount serviceAccount
+		}
+
+		type serviceAccount struct {
+			name string
+			secret string
+		}
+
+		DescribeTable(
+			"routes BuildTrigger with correct strategy",
+			func(tc testCase) {
+				key := types.NamespacedName{
+					Name:      tc.name,
+					Namespace: "default",
+				}
+
+				build := validBuild(tc.name, tc.strategy)
+				Expect(k8sClient.Create(ctx, build)).To(Succeed())
+				DeferCleanup(func() {
+					_ = k8sClient.Delete(ctx, build)
+				})
+
+				domain := &FakeBuildTriggerDomain{}
+				reconciler := newTestReconciler(domain)
+
+				_, err := reconciler.Reconcile(ctx, reconcile.Request{
+					NamespacedName: key,
+				})
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(domain.Called).To(BeTrue())
+
+				cmd := domain.Cmd
+				Expect(cmd.GVK.Kind).To(Equal("Build"))
+				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+
+				buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
+				Expect(ok).To(BeTrue())
+
+				Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
+				//Expect(buildObj.Spec.ServiceAccount.Name).To(Equal(tc.
+			},
+
+			Entry("kaniko", testCase{
+				name:     "build-kaniko",
+				strategy: "kaniko",
+			}),
+			Entry("buildah", testCase{
+				name:     "build-buildah",
+				strategy: "buildah-shipwright-managed-push",
+			}),
+			Entry("buildpacks", testCase{
+				name:     "build-buildpacks",
+				strategy: "buildpacks-v3",
+			}),
+		)
 	})
 })
