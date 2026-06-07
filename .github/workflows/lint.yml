@@ -6,7 +6,7 @@ on:
 
 jobs:
   lint:
-    name: Run on Ubuntu
+    name: Run on Self Hosted
     runs-on: self-hosted
     steps:
       - name: Clone the code
