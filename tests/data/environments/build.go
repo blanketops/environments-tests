@@ -1,9 +1,11 @@
 /*
-Copyright 2025 The BlanketOps Authors.
+Copyright 2026 The BlanketOps Authors.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
 	http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -202,16 +204,16 @@ func NewBuildData(name, namespace string) *BuildData {
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":                       "blanketops-environments",
-		        "app.kubernetes.io/part-of":                    "blanketops",
-		        "app.kubernetes.io/managed-by":                 "kustomize",
-		        "app.kubernetes.io/version":                    "v0.0.1",
-	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             envType,
-		        "environments.blanketops.dev/api-version":      "v0.1.4",
-		        "environments.blanketops.dev/contract-version": "v0.1.7",
-		        "environments.blanketops.dev/controller-version": "v0.2.3",
-		        "environments.blanketops.dev/operator-version": "v0.2.1",
+				"app.kubernetes.io/name":                         "blanketops-environments",
+				"app.kubernetes.io/part-of":                      "blanketops",
+				"app.kubernetes.io/managed-by":                   "kustomize",
+				"app.kubernetes.io/version":                      "v0.0.1",
+				"environments.blanketops.dev/name":               envName,
+				"environments.blanketops.dev/type":               envType,
+				"environments.blanketops.dev/api-version":        "v0.1.4",
+				"environments.blanketops.dev/contract-version":   "v0.1.7",
+				"environments.blanketops.dev/controller-version": "v0.2.3",
+				"environments.blanketops.dev/operator-version":   "v0.2.1",
 			},
 		},
 		Spec: BuildSpec{
