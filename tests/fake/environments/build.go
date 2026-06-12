@@ -19,23 +19,20 @@ import (
 	"context"
 	"fmt"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	// test data — apimachinery types we built
 
 	"github.com/go-logr/logr"
-
+	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1alpha1"
+	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
+	testdata "github.com/ntlaletsi70/blanketops-environments-tests/environments"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
-
-	// test data — apimachinery types we built
-	testdata "github.com/ntlaletsi70/blanketops-environments-tests/environments"
 )
 
 // -----------------------------------------------------------------------------
@@ -103,9 +100,9 @@ func buildFromData(d *testdata.BuildData) *environmentsv1alpha1.Build {
 				Name: d.Spec.Strategy.Name,
 			},
 			Source: environmentsv1alpha1.GitSource{
-				URL:        d.Spec.Source.URL,
-				Revision:   d.Spec.Source.Revision,
-				Context:    d.Spec.Source.ContextDir,
+				URL:         d.Spec.Source.URL,
+				Revision:    d.Spec.Source.Revision,
+				Context:     d.Spec.Source.ContextDir,
 				CloneSecret: d.Spec.Source.CloneSecret,
 			},
 			ServiceAccount: environmentsv1alpha1.ServiceAccount{
