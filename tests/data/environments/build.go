@@ -194,7 +194,7 @@ const (
 
 // NewBuildData returns a BuildData with sane defaults for use in tests.
 // Override fields as needed for specific test cases.
-func NewBuildData(name, namespace string) *BuildData {
+func NewBuildData(name, namespace, envName string) *BuildData {
 	return &BuildData{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "environments.blanketops.dev/v1alpha1",
@@ -209,7 +209,7 @@ func NewBuildData(name, namespace string) *BuildData {
 				"app.kubernetes.io/managed-by":                   "kustomize",
 				"app.kubernetes.io/version":                      "v0.0.1",
 				"environments.blanketops.dev/name":               envName,
-				"environments.blanketops.dev/type":               envType,
+				"environments.blanketops.dev/type":               "dev",
 				"environments.blanketops.dev/api-version":        "v0.1.4",
 				"environments.blanketops.dev/contract-version":   "v0.1.7",
 				"environments.blanketops.dev/controller-version": "v0.2.3",
@@ -248,8 +248,8 @@ func NewBuildData(name, namespace string) *BuildData {
 }
 
 // NewBuildahBuildData returns a BuildData using the buildah-shipwright-managed-push strategy.
-func NewBuildahBuildData(name, namespace string) *BuildData {
-	b := NewBuildData(name, namespace)
+func NewBuildahBuildData(name, namespace, envName string) *BuildData {
+	b := NewBuildData(name, namespace, envName)
 	b.Spec.Strategy = Strategy{
 		Name: "buildah-shipwright-managed-push",
 		Kind: StrategyKindCluster,
@@ -260,8 +260,8 @@ func NewBuildahBuildData(name, namespace string) *BuildData {
 
 // NewBuildpacksBuildData returns a BuildData using the buildpacks-v3 strategy.
 // No contextDir or dockerfile required — stack is auto-detected.
-func NewBuildpacksBuildData(name, namespace string) *BuildData {
-	b := NewBuildData(name, namespace)
+func NewBuildpacksBuildData(name, namespace, envName string) *BuildData {
+	b := NewBuildData(name, namespace, envName)
 	b.Spec.Strategy = Strategy{
 		Name: "buildpacks-v3",
 		Kind: StrategyKindCluster,
