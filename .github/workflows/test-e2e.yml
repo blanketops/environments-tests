@@ -6,8 +6,8 @@ on:
 
 jobs:
   test-e2e:
-    name: Run on Self Hosted
-    runs-on: self-hosted
+    name: Run on ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
@@ -30,3 +30,12 @@ jobs:
         run: |
           go mod tidy
           make test-e2e
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### ✅ \`make test-e2e\` passed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ❌ \`make test-e2e\` failed — see \`Running Test e2e\` step above" >> "$GITHUB_STEP_SUMMARY"
+          fi

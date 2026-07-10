@@ -87,12 +87,13 @@ suite is fully self-contained and deterministic.
 
 ## CI
 
-Two workflows run on Zenith Runners (self-hosted, ephemeral):
+Two workflows run on `ubuntu-latest` GitHub-hosted runners:
 
-* **`run-tests.yaml`** — full suite on push/PR. Emits JUnit XML via
+* **`run-tests.yml`** — full suite on push/PR. Emits JUnit XML via
   `go-junit-report`, surfaced as a check through `dorny/test-reporter`.
-* **`create-test-issues.yaml`** — files tracking issues for skipped or
-  failing conformance areas.
+* **`create-test.yml`** — on every PR merged into `main`, files a tracking
+  issue for each test file that PR touched (not a full-tree rescan). Also
+  runnable via `workflow_dispatch` for a one-off full scan.
 
 ## Conventions
 

@@ -6,8 +6,8 @@ on:
 
 jobs:
   lint:
-    name: Run on Self Hosted
-    runs-on: self-hosted
+    name: Run on ubuntu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Clone the code
         uses: actions/checkout@v4
@@ -21,3 +21,12 @@ jobs:
         run: make lint-config
       - name: Run linter
         run: make lint
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "### ✅ Lint passed" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### ❌ Lint failed — see \`Run linter\` step above" >> "$GITHUB_STEP_SUMMARY"
+          fi
