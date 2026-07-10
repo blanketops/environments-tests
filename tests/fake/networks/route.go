@@ -136,7 +136,7 @@ var _ = Describe("Route Controller", func() {
 			if err := k8sClient.Get(ctx, key, r); errors.IsNotFound(err) {
 				Expect(
 					k8sClient.Create(ctx, routeFromData(
-						testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za"),
+						testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za", "for-kaniko-app"),
 					)),
 				).To(Succeed())
 			}
@@ -226,7 +226,7 @@ var _ = Describe("Route Controller", func() {
 					Namespace: testNamespace,
 				}
 
-				d := testdata.NewRouteData(tc.name, testNamespace, tc.host)
+				d := testdata.NewRouteData(tc.name, testNamespace, tc.host, "for-kaniko-app")
 				d.Spec.Path = tc.path
 				d.Spec.TLSEnabled = tc.tlsEnabled
 				d.Spec.Enabled = tc.enabled
@@ -316,7 +316,7 @@ var _ = Describe("Route Controller", func() {
 			const name = "route-sub-path"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za")
+			d := testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za", "for-kaniko-app")
 			d.Spec.Path = "/api/v1"
 			Expect(k8sClient.Create(ctx, routeFromData(d))).To(Succeed())
 			DeferCleanup(func() {

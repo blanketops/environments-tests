@@ -156,7 +156,7 @@ func NewGitHubEventData(name, envName string) *GitHubEventData {
 		        "app.kubernetes.io/managed-by":                 "kustomize",
 		        "app.kubernetes.io/version":                    "v0.0.1",
 	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             envType,
+		        "environments.blanketops.dev/type":             "dev",
 		        "environments.blanketops.dev/api-version":      "v0.1.4",
 		        "environments.blanketops.dev/contract-version": "v0.1.7",
 		        "environments.blanketops.dev/controller-version": "v0.2.3",

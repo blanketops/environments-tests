@@ -5,7 +5,7 @@ go 1.25.7
 require (
 	github.com/BlanketOps/environments-api v0.1.9
 	github.com/go-logr/logr v1.4.3
-	github.com/ntlaletsi70/blanketops-environments v0.6.5
+	github.com/ntlaletsi70/blanketops-environments-mvp v0.0.0-20260228172329-7abe01b2b4f2
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	k8s.io/apimachinery v0.35.2
@@ -39,7 +39,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/ntlaletsi70/blanketops-environments-api v0.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect

@@ -22,7 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"

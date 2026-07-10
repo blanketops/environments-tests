@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
 
 	// test data — apimachinery types we built
 	testdata "github.com/blanketops-environments-tests/tests/data/environments"
@@ -139,7 +139,7 @@ var _ = Describe("Deployment Controller", func() {
 			if err := k8sClient.Get(ctx, key, deployment); errors.IsNotFound(err) {
 				Expect(
 					k8sClient.Create(ctx, deploymentFromData(
-						testdata.NewDeploymentData(name, testNamespace),
+						testdata.NewDeploymentData(name, testNamespace, "for-kaniko-app"),
 					)),
 				).To(Succeed())
 			}
@@ -218,7 +218,7 @@ var _ = Describe("Deployment Controller", func() {
 					Namespace: testNamespace,
 				}
 
-				d := testdata.NewDeploymentData(tc.name, testNamespace)
+				d := testdata.NewDeploymentData(tc.name, testNamespace, "for-kaniko-app")
 				d.Spec.Contract.Strategy = tc.strategy
 				d.Spec.Contract.ImageAutomation = tc.imageAutomation
 
@@ -293,7 +293,7 @@ var _ = Describe("Deployment Controller", func() {
 					Namespace: testNamespace,
 				}
 
-				d := testdata.NewDeploymentData(tc.name, testNamespace)
+				d := testdata.NewDeploymentData(tc.name, testNamespace, "for-kaniko-app")
 				d.Spec.Contract.Runtime = tc.runtime
 
 				Expect(k8sClient.Create(ctx, deploymentFromData(d))).To(Succeed())
@@ -339,7 +339,7 @@ var _ = Describe("Deployment Controller", func() {
 			const name = "deployment-multi-unit"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewMultiUnitDeploymentData(name, testNamespace)
+			d := testdata.NewMultiUnitDeploymentData(name, testNamespace, "for-kaniko-app")
 			Expect(k8sClient.Create(ctx, deploymentFromData(d))).To(Succeed())
 			DeferCleanup(func() {
 				deployment := &environmentsv1alpha1.Deployment{}

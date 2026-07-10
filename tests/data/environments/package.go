@@ -203,7 +203,7 @@ const (
 // NewPackageData returns a PackageData matching the canonical
 // for-kaniko-app dev package — kapp-diff enabled, kustomization strategy.
 // Matches: environments.blanketops.dev/v1 Package for-kaniko-app
-func NewPackageData(name, namespace string) *PackageData {
+func NewPackageData(name, namespace, envName string) *PackageData {
 	return &PackageData{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "environments.blanketops.dev/v1",
@@ -218,7 +218,7 @@ func NewPackageData(name, namespace string) *PackageData {
 		        "app.kubernetes.io/managed-by":                 "kustomize",
 		        "app.kubernetes.io/version":                    "v0.0.1",
 	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             envType,
+		        "environments.blanketops.dev/type":             "dev",
 		        "environments.blanketops.dev/api-version":      "v0.1.4",
 		        "environments.blanketops.dev/contract-version": "v0.1.7",
 		        "environments.blanketops.dev/controller-version": "v0.2.3",
@@ -260,24 +260,24 @@ func NewPackageData(name, namespace string) *PackageData {
 
 // NewDisabledPackageData returns a PackageData with enabled=false.
 // Simulates a paused package — reconciliation suspended without deletion.
-func NewDisabledPackageData(name, namespace string) *PackageData {
-	p := NewPackageData(name, namespace)
+func NewDisabledPackageData(name, namespace, envName string) *PackageData {
+	p := NewPackageData(name, namespace, envName)
 	p.Spec.Contract.Enabled = false
 	return p
 }
 
 // NewNoDiffPackageData returns a PackageData with packageKappDiff=false.
 // Simulates a package that applies without a diff preview step.
-func NewNoDiffPackageData(name, namespace string) *PackageData {
-	p := NewPackageData(name, namespace)
+func NewNoDiffPackageData(name, namespace, envName string) *PackageData {
+	p := NewPackageData(name, namespace, envName)
 	p.Spec.Contract.PackageKappDiff = false
 	return p
 }
 
 // NewStagingPackageData returns a PackageData targeting a staging state repository.
 // Uses a staging branch and overlay path.
-func NewStagingPackageData(name, namespace string) *PackageData {
-	p := NewPackageData(name, namespace)
+func NewStagingPackageData(name, namespace, envName string) *PackageData {
+	p := NewPackageData(name, namespace, envName)
 	p.ObjectMeta.Labels["environments.blanketops.dev/type"] = "staging"
 	p.Spec.Contract.StateRepo.Ref = StateRepoRef{Branch: "main"}
 	p.Spec.Contract.StateRepo.Path = "./clusters/staging"

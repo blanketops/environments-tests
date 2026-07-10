@@ -154,7 +154,7 @@ const (
 // NewGitRepositoryData returns a GitRepositoryData matching the canonical
 // for-kaniko-app source registration — push + pull_request events via GitHub.
 // Matches: sources.blanketops.dev/v1alpha1 GitRepository for-kaniko-app
-func NewGitRepositoryData(name string) *GitRepositoryData {
+func NewGitRepositoryData(name, envName string) *GitRepositoryData {
 	return &GitRepositoryData{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "sources.blanketops.dev/v1alpha1",
@@ -168,7 +168,7 @@ func NewGitRepositoryData(name string) *GitRepositoryData {
 		        "app.kubernetes.io/managed-by":                 "kustomize",
 		        "app.kubernetes.io/version":                    "v0.0.1",
 	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             envType,
+		        "environments.blanketops.dev/type":             "dev",
 		        "environments.blanketops.dev/api-version":      "v0.1.4",
 		        "environments.blanketops.dev/contract-version": "v0.1.7",
 		        "environments.blanketops.dev/controller-version": "v0.2.3",
@@ -198,8 +198,8 @@ func NewGitRepositoryData(name string) *GitRepositoryData {
 
 // NewPushOnlyGitRepositoryData returns a GitRepositoryData subscribed to
 // push events only. Useful for testing push-gated pipelines.
-func NewPushOnlyGitRepositoryData(name string) *GitRepositoryData {
-	r := NewGitRepositoryData(name)
+func NewPushOnlyGitRepositoryData(name, envName string) *GitRepositoryData {
+	r := NewGitRepositoryData(name, envName)
 	r.Spec.Contract.Webhooks = []WebhookSubscription{
 		{Events: []WebhookEvent{WebhookEventPush}},
 	}
@@ -208,8 +208,8 @@ func NewPushOnlyGitRepositoryData(name string) *GitRepositoryData {
 
 // NewGitRepositoryDataWithHookURL returns a GitRepositoryData with a custom
 // hookUrl. Useful for testing production ingress URLs vs dev tunnel URLs.
-func NewGitRepositoryDataWithHookURL(name, hookURL string) *GitRepositoryData {
-	r := NewGitRepositoryData(name)
+func NewGitRepositoryDataWithHookURL(name, hookURL, envName string) *GitRepositoryData {
+	r := NewGitRepositoryData(name, envName)
 	r.Spec.Contract.HookURL = hookURL
 	return r
 }
