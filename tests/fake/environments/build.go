@@ -22,7 +22,7 @@ import (
 
 	"github.com/go-logr/logr"
 	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
+	"github.com/ntlaletsi70/blanketops-environments/core"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -119,12 +119,12 @@ func validBuild(name, namespace, strategy string) *environmentsv1alpha1.Build {
 	var d *testdata.BuildData
 	switch strategy {
 	case "buildah-shipwright-managed-push":
-		d = testdata.NewBuildahBuildData(name, namespace)
+		d = testdata.NewBuildahBuildData(name, namespace, "for-kaniko-app")
 	case "buildpacks-v3":
-		d = testdata.NewBuildpacksBuildData(name, namespace)
+		d = testdata.NewBuildpacksBuildData(name, namespace, "for-kaniko-app")
 	default:
 		// kaniko or any other strategy
-		d = testdata.NewBuildData(name, namespace)
+		d = testdata.NewBuildData(name, namespace, "for-kaniko-app")
 		d.Spec.Strategy.Name = strategy
 	}
 	return buildFromData(d)

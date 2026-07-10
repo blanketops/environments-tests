@@ -224,7 +224,7 @@ const (
 // NewDeploymentData returns a DeploymentData matching the canonical
 // for-kaniko-app dev deployment — single ServiceUnit, Rolling, kustomize.
 // Matches: environments.blanketops.dev/v1alpha1 Deployment for-kaniko-app
-func NewDeploymentData(name, namespace string) *DeploymentData {
+func NewDeploymentData(name, namespace, envName string) *DeploymentData {
 	return &DeploymentData{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "environments.blanketops.dev/v1alpha1",
@@ -239,7 +239,7 @@ func NewDeploymentData(name, namespace string) *DeploymentData {
 		        "app.kubernetes.io/managed-by":                 "kustomize",
 		        "app.kubernetes.io/version":                    "v0.0.1",
 	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             envType,
+		        "environments.blanketops.dev/type":             "dev",
 		        "environments.blanketops.dev/api-version":      "v0.1.4",
 		        "environments.blanketops.dev/contract-version": "v0.1.7",
 		        "environments.blanketops.dev/controller-version": "v0.2.3",
@@ -267,8 +267,8 @@ func NewDeploymentData(name, namespace string) *DeploymentData {
 
 // NewMultiUnitDeploymentData returns a DeploymentData with multiple ServiceUnits.
 // Matches the commented prod example — api + worker, imageAutomation enabled.
-func NewMultiUnitDeploymentData(name, namespace string) *DeploymentData {
-	d := NewDeploymentData(name, namespace)
+func NewMultiUnitDeploymentData(name, namespace, envName string) *DeploymentData {
+	d := NewDeploymentData(name, namespace, envName)
 	d.ObjectMeta.Labels["environments.blanketops.dev/type"] = "production"
 	d.Spec.Contract.ServiceUnits = []string{name + "-api", name + "-worker"}
 	d.Spec.Contract.ImageAutomation = true
@@ -283,8 +283,8 @@ func NewMultiUnitDeploymentData(name, namespace string) *DeploymentData {
 
 // NewKnativeDeploymentData returns a DeploymentData targeting the Knative runtime.
 // Requires Knative Serving + Kourier installed on the cluster.
-func NewKnativeDeploymentData(name, namespace string) *DeploymentData {
-	d := NewDeploymentData(name, namespace)
+func NewKnativeDeploymentData(name, namespace, envName string) *DeploymentData {
+	d := NewDeploymentData(name, namespace, envName)
 	d.Spec.Contract.Runtime = DeploymentRuntimeKnative
 	d.Spec.Contract.Strategy = DeploymentStrategyCanary
 	return d
