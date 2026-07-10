@@ -18,358 +18,44 @@ package events
 import (
 	"context"
 	"fmt"
-	// test data — apimachinery types we built
-	// test data — apimachinery types we built
-	// test data — apimachinery types we built
-e correct CR — child resource
-type FakeGitHubEventDomain struct {
-	Called bool
-	Err    error
-}
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
-func (f *FakeGitHubEventDomain
 
-	// test data — apimachiner	// test data — apimachiner	// test data — apimachiner	. "github.com/onsi/ginkgo/	. "github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/go-logr/logr"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	eventsv1alpha1 "github.com/BlanketOps/environments-api/api/events/v1alpha1"
+	"github.com/ntlaletsi70/blanketops-environments/core"
+
+	// test data — apimachinery types we built
+	testdata "github.com/blanketops-environments-tests/tests/data/events"
+)
+
+// -----------------------------------------------------------------------------
+// Fake GitHubEvent Domain (correct seam)
+//
+// This is the ONLY thing we fake.
+// The controller, registry, engine, and command flow are all real.
+//
+// The GitHubEvent controller reconciles three child Argo Events resources:
+//   EventSource, EventBus, Sensor — all owned by the GitHubEvent CR.
+// We test only that the domain receives the correct CR — child resource
 // reconciliation is covered in integration tests.
+// -----------------------------------------------------------------------------
+
+type FakeGitHubEventDomain struct {
+	Called bool
 	Cmd    core.Command
+	Err    error
+}
+
 func (f *FakeGitHubEventDomain) CanCreate(obj client.Object) bool { return true }
 func (f *FakeGitHubEventDomain) CanDelete(obj client.Object) bool { return true }
 func (f *FakeGitHubEventDomain) CanUpdate(obj client.Object, old client.Object) bool {
