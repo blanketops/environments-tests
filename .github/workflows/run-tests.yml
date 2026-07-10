@@ -16,8 +16,8 @@ on:
 
 jobs:
   test:
-    name: Run on Self Hosted
-    runs-on: self-hosted
+    name: Run on ubuntu-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       checks: write
@@ -99,3 +99,20 @@ jobs:
         path: reports/junit.xml
         reporter: java-junit
         fail-on-error: false
+
+    - name: Summary
+      if: always()
+      run: |
+        PASS=$(jq -r 'select(.Action=="pass" and .Test!=null) | .Test' reports/test-output.json 2>/dev/null | sort -u | wc -l)
+        FAIL=$(jq -r 'select(.Action=="fail" and .Test!=null) | .Test' reports/test-output.json 2>/dev/null | sort -u | wc -l)
+        SKIP=$(jq -r 'select(.Action=="skip" and .Test!=null) | .Test' reports/test-output.json 2>/dev/null | sort -u | wc -l)
+
+        {
+          echo "### Test results — \`${{ steps.resolve.outputs.test_path }}\`"
+          echo ""
+          echo "| Status | Count |"
+          echo "|--------|-------|"
+          echo "| ✅ Passed | $PASS |"
+          echo "| ❌ Failed | $FAIL |"
+          echo "| ⏭️ Skipped | $SKIP |"
+        } >> "$GITHUB_STEP_SUMMARY"
