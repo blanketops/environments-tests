@@ -236,7 +236,7 @@ var _ = Describe("Package Controller", func() {
 					Namespace: testNamespace,
 				}
 
-				d := testdata.NewPackageData(tc.name, testNamespace, "for-kaniko-app")
+				d := testdata.NewPackageData(tc.name, testNamespace)
 				d.Spec.Contract.StateRepo.Strategy = tc.strategy
 				d.Spec.Contract.PackageKappDiff = tc.kappDiff
 				d.Spec.Contract.StateRepo.Ref.Branch = tc.stateBranch
@@ -306,7 +306,7 @@ var _ = Describe("Package Controller", func() {
 			const name = "pkg-disabled"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewDisabledPackageData(name, testNamespace, "for-kaniko-app")
+			d := testdata.NewDisabledPackageData(name, testNamespace)
 			Expect(k8sClient.Create(ctx, packageFromData(d))).To(Succeed())
 			DeferCleanup(func() {
 				pkg := &environmentsv1.Package{}
@@ -341,7 +341,7 @@ var _ = Describe("Package Controller", func() {
 			const name = "pkg-metadata"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewPackageData(name, testNamespace, "for-kaniko-app")
+			d := testdata.NewPackageData(name, testNamespace)
 			Expect(k8sClient.Create(ctx, packageFromData(d))).To(Succeed())
 			DeferCleanup(func() {
 				pkg := &environmentsv1.Package{}

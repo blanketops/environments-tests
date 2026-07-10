@@ -18,23 +18,20 @@ package networks
 import (
 	"context"
 	"fmt"
+	// test data — apimachinery types we built
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"github.com/go-logr/logr"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	networksv1alpha1 "github.com/BlanketOps/environments-api/api/networks/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments/core"
 
-	// test data — apimachinery types we built
 	testdata "github.com/blanketops-environments-tests/tests/data/networks"
 )
 

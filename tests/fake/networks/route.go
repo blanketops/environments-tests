@@ -18,21 +18,19 @@ package networks
 import (
 	"context"
 	"fmt"
+	// test data — apimachinery types we built
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	networksv1alpha1 "github.com/BlanketOps/environments-api/api/networks/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments/core"
 
-	// test data — apimachinery types we built
 	testdata "github.com/blanketops-environments-tests/tests/data/networks"
 )
 
@@ -226,7 +224,7 @@ var _ = Describe("Route Controller", func() {
 					Namespace: testNamespace,
 				}
 
-				d := testdata.NewRouteData(tc.name, testNamespace, tc.host, "for-kaniko-app")
+				d := testdata.NewRouteData(tc.name, testNamespace, tc.host)
 				d.Spec.Path = tc.path
 				d.Spec.TLSEnabled = tc.tlsEnabled
 				d.Spec.Enabled = tc.enabled
@@ -316,7 +314,7 @@ var _ = Describe("Route Controller", func() {
 			const name = "route-sub-path"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za", "for-kaniko-app")
+			d := testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za")
 			d.Spec.Path = "/api/v1"
 			Expect(k8sClient.Create(ctx, routeFromData(d))).To(Succeed())
 			DeferCleanup(func() {
