@@ -132,7 +132,7 @@ const (
 // NewRouteData returns a RouteData for a platform domain route.
 // Platform domain: *.dev.domain.co.za — covered by wildcard DNS01 cert.
 // Matches: networking.environments.blanketops.dev/v1alpha1 Route
-func NewRouteData(name, namespace, host string) *RouteData {
+func NewRouteData(name, namespace, host, envName string) *RouteData {
 	return &RouteData{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "networking.environments.blanketops.dev/v1alpha1",
@@ -147,7 +147,7 @@ func NewRouteData(name, namespace, host string) *RouteData {
 		        "app.kubernetes.io/managed-by":                 "kustomize",
 		        "app.kubernetes.io/version":                    "v0.0.1",
 	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             envType,
+		        "environments.blanketops.dev/type":             "dev",
 		        "environments.blanketops.dev/api-version":      "v0.1.4",
 		        "environments.blanketops.dev/contract-version": "v0.1.7",
 		        "environments.blanketops.dev/controller-version": "v0.2.3",
@@ -166,32 +166,32 @@ func NewRouteData(name, namespace, host string) *RouteData {
 
 // NewCustomDomainRouteData returns a RouteData for a custom tenant domain.
 // Custom domain: client-a.co.za — triggers HTTP01 Issuer per tenant namespace.
-func NewCustomDomainRouteData(name, namespace, host string) *RouteData {
-	r := NewRouteData(name, namespace, host)
+func NewCustomDomainRouteData(name, namespace, host, envName string) *RouteData {
+	r := NewRouteData(name, namespace, host, envName)
 	r.ObjectMeta.Labels["environments.blanketops.dev/type"] = "production"
 	return r
 }
 
 // NewDisabledRouteData returns a RouteData with enabled=false.
 // Simulates a route that is temporarily disabled without deletion.
-func NewDisabledRouteData(name, namespace, host string) *RouteData {
-	r := NewRouteData(name, namespace, host)
+func NewDisabledRouteData(name, namespace, host, envName string) *RouteData {
+	r := NewRouteData(name, namespace, host, envName)
 	r.Spec.Enabled = false
 	return r
 }
 
 // NewHTTPRouteData returns a RouteData with TLS disabled — HTTP only.
 // Useful for testing non-TLS ingress paths.
-func NewHTTPRouteData(name, namespace, host string) *RouteData {
-	r := NewRouteData(name, namespace, host)
+func NewHTTPRouteData(name, namespace, host, envName string) *RouteData {
+	r := NewRouteData(name, namespace, host, envName)
 	r.Spec.TLSEnabled = false
 	return r
 }
 
 // NewKnativeRouteData returns a RouteData targeting the Knative serving runtime.
 // Requires Knative Serving + Kourier installed on the cluster.
-func NewKnativeRouteData(name, namespace, host string) *RouteData {
-	r := NewRouteData(name, namespace, host)
+func NewKnativeRouteData(name, namespace, host, envName string) *RouteData {
+	r := NewRouteData(name, namespace, host, envName)
 	r.Spec.Runtime = RouteRuntimeKnative
 	return r
 }

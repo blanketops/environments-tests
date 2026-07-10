@@ -153,7 +153,7 @@ var _ = Describe("GitRepository Controller", func() {
 			if err := k8sClient.Get(ctx, key, gr); errors.IsNotFound(err) {
 				Expect(
 					k8sClient.Create(ctx, gitRepositoryFromData(
-						testdata.NewGitRepositoryData(name),
+						testdata.NewGitRepositoryData(name, "for-kaniko-app"),
 					)),
 				).To(Succeed())
 			}
@@ -233,7 +233,7 @@ var _ = Describe("GitRepository Controller", func() {
 					Namespace: testNamespace,
 				}
 
-				d := testdata.NewGitRepositoryData(tc.repoName)
+				d := testdata.NewGitRepositoryData(tc.repoName, tc.repoName)
 				d.Name = tc.name
 				d.Spec.Contract.HookURL = tc.hookURL
 				d.Spec.Contract.Webhooks = []testdata.WebhookSubscription{
@@ -310,7 +310,7 @@ var _ = Describe("GitRepository Controller", func() {
 			const name = "gr-repo-identity"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewGitRepositoryData("for-kaniko-app")
+			d := testdata.NewGitRepositoryData("for-kaniko-app", "for-kaniko-app")
 			d.Name = name
 			Expect(k8sClient.Create(ctx, gitRepositoryFromData(d))).To(Succeed())
 			DeferCleanup(func() {
