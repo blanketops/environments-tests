@@ -28,7 +28,6 @@ package grpc_test
 //
 // Covered services:
 //   BuildService          blanketops/environments/v1alpha1/build.proto
-//   BuildTriggerService   blanketops/environments/v1/buildtrigger.proto
 //   DeploymentService     blanketops/environments/v1/deployment.proto
 //   PackageService        blanketops/environments/v1/package.proto
 //   ServiceUnitService    blanketops/environments/v1alpha1/serviceunit.proto

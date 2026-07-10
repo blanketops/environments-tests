@@ -27,7 +27,7 @@ jobs:
     - name: Clone the code
       uses: actions/checkout@v4
       with:
-        ref: main
+        ref: master
 
     - name: Setup Go
       uses: actions/setup-go@v5
@@ -37,7 +37,7 @@ jobs:
     - name: Resolve changed test files
       id: files
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_PAT }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
       run: |
@@ -55,7 +55,7 @@ jobs:
 
     - name: Create test tracking issues
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_PAT }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         PR_URL: ${{ github.event.pull_request.html_url }}

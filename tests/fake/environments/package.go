@@ -29,11 +29,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	environmentsv1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1"
+	environmentsv1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
 
 	// test data — apimachinery types we built
-	testdata "github.com/ntlaletsi70/blanketops-environments-tests/environments"
+	testdata "github.com/blanketops-environments-tests/tests/data/environments"
 )
 
 // -----------------------------------------------------------------------------

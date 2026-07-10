@@ -31,7 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1alpha1"
+	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
