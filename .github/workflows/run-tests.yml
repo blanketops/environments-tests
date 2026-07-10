@@ -100,6 +100,25 @@ jobs:
         path: reports/
         retention-days: 30
 
+    - name: Install Allure CLI
+      if: always()
+      run: npm install -g allure-commandline
+
+    - name: Generate Allure report
+      if: always()
+      run: |
+        # Allure2 auto-detects JUnit XML in the input directory — no native
+        # allure-results needed for a go test / go-junit-report pipeline.
+        allure generate reports/ -o allure-report --clean
+
+    - name: Upload Allure report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: allure-report-${{ github.run_number }}
+        path: allure-report/
+        retention-days: 30
+
     - name: Publish test results
       if: always()
       uses: dorny/test-reporter@v1
