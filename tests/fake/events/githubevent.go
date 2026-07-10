@@ -31,11 +31,11 @@ import (
 
 	"github.com/go-logr/logr"
 
-	eventsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/events/v1alpha1"
+	eventsv1alpha1 "github.com/BlanketOps/environments-api/api/events/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
 
 	// test data — apimachinery types we built
-	testdata "github.com/ntlaletsi70/blanketops-environments-tests/events"
+	testdata "github.com/blanketops-environments-tests/tests/data/events"
 )
 
 // -----------------------------------------------------------------------------

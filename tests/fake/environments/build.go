@@ -18,13 +18,11 @@ package environments
 import (
 	"context"
 	"fmt"
-
 	// test data — apimachinery types we built
 
 	"github.com/go-logr/logr"
-	environmentsv1alpha1 "github.com/ntlaletsi70/blanketops-environments-api/api/environments/v1alpha1"
+	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
 	"github.com/ntlaletsi70/blanketops-environments-mvp/core"
-	testdata "github.com/ntlaletsi70/blanketops-environments-tests/environments"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,6 +31,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	testdata "github.com/blanketops-environments-tests/tests/data/environments"
 )
 
 // -----------------------------------------------------------------------------

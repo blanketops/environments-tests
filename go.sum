@@ -1,3 +1,5 @@
+github.com/BlanketOps/environments-api v0.1.9 h1:ZDkYnlxqdOWyz2zXGhiF3eYz83qjnyBMEQzhmfYnD6Y=
+github.com/BlanketOps/environments-api v0.1.9/go.mod h1:s5ee3CQMCDkaYLwt5BL8fmnXqDtcVWYh50lc/WHAWB8=
 github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
 github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
@@ -85,8 +87,8 @@ github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee h1:W5t00kpgFd
 github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822/go.mod h1:+n7T8mK8HuQTcFwEeznm/DIxMOiR9yIdICNftLE1DvQ=
-github.com/ntlaletsi70/blanketops-environments-api v0.0.4 h1:IQKB9hkTjA6es7SmHWQ4kocqYQAS8jmGeJsNWGsZSns=
-github.com/ntlaletsi70/blanketops-environments-api v0.0.4/go.mod h1:SsY2hPuPdvLBySCXTd98T84rZQlG4voQrUkmuLTQCbw=
+github.com/ntlaletsi70/blanketops-environments-api v0.0.2 h1:UN9jR0FxgClkINs8k5d5jN+MBwsGrs/dZkP8TUFwQIg=
+github.com/ntlaletsi70/blanketops-environments-api v0.0.2/go.mod h1:AWD73jc+O0TwBpICfLa2SvP21/kZghN4xSBENP57oQw=
 github.com/ntlaletsi70/blanketops-environments-mvp v0.0.0-20260228172329-7abe01b2b4f2 h1:B9hqNhDL1Gr3SogThCTqauIoKEQH8La1Jij8xVY0W4g=
 github.com/ntlaletsi70/blanketops-environments-mvp v0.0.0-20260228172329-7abe01b2b4f2/go.mod h1:kRpqOe60efTsD4UvYyv4N1pa/OrJvudpn9l7fhPS5dQ=
 github.com/onsi/ginkgo/v2 v2.28.1 h1:S4hj+HbZp40fNKuLUQOYLDgZLwNUVn19N3Atb98NCyI=
