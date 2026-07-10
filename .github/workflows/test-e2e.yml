@@ -17,6 +17,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Configure Git for private modules
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git config --global url."https://${GH_PAT}@github.com/".insteadOf "https://github.com/"
+          go env -w GOPRIVATE=github.com/ntlaletsi70/*
+          go env -w GONOSUMDB=github.com/ntlaletsi70/*
+          go env -w GOPROXY=direct
+
       - name: Install the latest version of kind
         run: |
           curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-$(go env GOARCH)
