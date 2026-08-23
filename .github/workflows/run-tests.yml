@@ -115,12 +115,39 @@ jobs:
       if: always()
       run: npm install -g allure-commandline
 
+    - name: Restore Allure history
+      if: always()
+      uses: actions/cache@v4
+      with:
+        path: allure-history
+        key: allure-history-${{ github.run_id }}
+        restore-keys: |
+          allure-history-
+
+    - name: Seed Allure history
+      if: always()
+      run: |
+        mkdir -p reports/history
+        if [ -d allure-history/history ]; then
+          cp -r allure-history/history/. reports/history/
+        fi
+
     - name: Generate Allure report
       if: always()
       run: |
         # Allure2 auto-detects JUnit XML in the input directory — no native
         # allure-results needed for a go test / go-junit-report pipeline.
+        # reports/history (seeded above) is what makes the trend widgets
+        # (duration/history/retry/categories-trend) build up over runs
+        # instead of resetting every time.
         allure generate reports/ -o allure-report --clean
+
+    - name: Persist Allure history
+      if: always()
+      run: |
+        mkdir -p allure-history
+        rm -rf allure-history/history
+        cp -r allure-report/history allure-history/history
 
     - name: Upload Allure report
       if: always()
