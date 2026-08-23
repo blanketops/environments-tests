@@ -109,7 +109,7 @@ jobs:
       with:
         name: test-report-${{ github.run_number }}
         path: reports/
-        retention-days: 30
+        retention-days: 15
 
     - name: Install Allure CLI
       if: always()
@@ -155,7 +155,7 @@ jobs:
       with:
         name: allure-report-${{ github.run_number }}
         path: allure-report/
-        retention-days: 30
+        retention-days: 15
 
     - name: Publish test results
       if: always()
