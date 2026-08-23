@@ -174,7 +174,7 @@ var _ = Describe("ServiceUnit Controller", func() {
 			domain := &FakeServiceUnitDomain{}
 			reconciler := newServiceUnitReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})

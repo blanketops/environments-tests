@@ -217,9 +217,7 @@ const (
 	ServiceUnitPhaseFailed    ServiceUnitPhaseValue = "Failed"
 )
 
-// -----------------------------------------------------------------------------
 // Test fixtures
-// -----------------------------------------------------------------------------
 
 // NewDeploymentData returns a DeploymentData matching the canonical
 // for-kaniko-app dev deployment — single ServiceUnit, Rolling, kustomize.
@@ -269,7 +267,7 @@ func NewDeploymentData(name, namespace, envName string) *DeploymentData {
 // Matches the commented prod example — api + worker, imageAutomation enabled.
 func NewMultiUnitDeploymentData(name, namespace, envName string) *DeploymentData {
 	d := NewDeploymentData(name, namespace, envName)
-	d.ObjectMeta.Labels["environments.blanketops.dev/type"] = "production"
+	d.Labels["environments.blanketops.dev/type"] = "production"
 	d.Spec.Contract.ServiceUnits = []string{name + "-api", name + "-worker"}
 	d.Spec.Contract.ImageAutomation = true
 	d.Spec.Contract.ManifestsRepo = ManifestsRepo{

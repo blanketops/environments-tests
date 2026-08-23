@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	// test data — apimachinery types we built
 
 	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
 	envctrl "github.com/blanketops/environments-controller/pkg/controller/environments"
@@ -41,12 +40,10 @@ import (
 	testdata "github.com/blanketops/environments-tests/tests/data/environments"
 )
 
-// -----------------------------------------------------------------------------
 // Fake Build Domain (correct seam)
 //
 // This is the ONLY thing we fake.
 // The controller, registry, engine, and command flow are all real.
-// -----------------------------------------------------------------------------
 
 type FakeBuildDomain struct {
 	Called bool
@@ -72,9 +69,7 @@ func (f *FakeBuildDomain) GVK() schema.GroupVersionKind {
 
 var testLogger = logr.Discard()
 
-// -----------------------------------------------------------------------------
 // Test helpers
-// -----------------------------------------------------------------------------
 
 func newBuildTestReconciler(domain *FakeBuildDomain) *envctrl.BuildReconciler {
 	reg := registry.NewRegistry()
@@ -132,18 +127,14 @@ func validBuild(name, namespace, strategy string) *environmentsv1alpha1.Build {
 	return buildFromData(d)
 }
 
-// -----------------------------------------------------------------------------
 // Build Controller Tests
-// -----------------------------------------------------------------------------
 
 var _ = Describe("Build Controller", func() {
 	ctx := context.Background()
 
 	const testNamespace = "default"
 
-	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
-	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
 		const name = "test-build-basic"
@@ -197,7 +188,7 @@ var _ = Describe("Build Controller", func() {
 			domain := &FakeBuildDomain{}
 			reconciler := newBuildTestReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})
@@ -227,9 +218,7 @@ var _ = Describe("Build Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// STRATEGY ROUTING
-	// -------------------------------------------------------------------------
 
 	Context("Build strategy routing", func() {
 		type buildTestCase struct {
@@ -296,9 +285,7 @@ var _ = Describe("Build Controller", func() {
 		)
 	})
 
-	// -------------------------------------------------------------------------
 	// NOT FOUND — CR deleted before reconcile loop runs
-	// -------------------------------------------------------------------------
 
 	Context("Build not found", func() {
 		It("returns no error when the Build CR no longer exists", func() {

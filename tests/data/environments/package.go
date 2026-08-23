@@ -196,9 +196,7 @@ const (
 	PackagePhaseFailed PackagePhaseValue = "Failed"
 )
 
-// -----------------------------------------------------------------------------
 // Test fixtures
-// -----------------------------------------------------------------------------
 
 // NewPackageData returns a PackageData matching the canonical
 // for-kaniko-app dev package — kapp-diff enabled, kustomization strategy.
@@ -278,7 +276,7 @@ func NewNoDiffPackageData(name, namespace, envName string) *PackageData {
 // Uses a staging branch and overlay path.
 func NewStagingPackageData(name, namespace, envName string) *PackageData {
 	p := NewPackageData(name, namespace, envName)
-	p.ObjectMeta.Labels["environments.blanketops.dev/type"] = "staging"
+	p.Labels["environments.blanketops.dev/type"] = "staging"
 	p.Spec.Contract.StateRepo.Ref = StateRepoRef{Branch: "main"}
 	p.Spec.Contract.StateRepo.Path = "./clusters/staging"
 	return p

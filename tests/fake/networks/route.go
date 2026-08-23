@@ -42,7 +42,6 @@ import (
 	testdata "github.com/blanketops/environments-tests/tests/data/networks"
 )
 
-// -----------------------------------------------------------------------------
 // Fake Route Domain (correct seam)
 //
 // This is the ONLY thing we fake.
@@ -52,7 +51,6 @@ import (
 // Route owns the workload binding (host, path, runtime).
 // Domain owns the cert/mapping chain for the host.
 // We test only that the domain receives the correct CR.
-// -----------------------------------------------------------------------------
 
 type FakeRouteDomain struct {
 	Called bool
@@ -78,9 +76,7 @@ func (f *FakeRouteDomain) GVK() schema.GroupVersionKind {
 
 // Note: domainTestLogger declared in domain_controller_test.go — same package.
 
-// -----------------------------------------------------------------------------
 // Test helpers
-// -----------------------------------------------------------------------------
 
 func newRouteReconciler(domain *FakeRouteDomain) *envctrl.RouteReconciler {
 	reg := registry.NewRegistry()
@@ -120,9 +116,7 @@ func routeFromData(d *testdata.RouteData) *networksv1alpha1.Route {
 	}
 }
 
-// -----------------------------------------------------------------------------
 // Route Controller Tests
-// -----------------------------------------------------------------------------
 
 var _ = Describe("Route Controller", func() {
 	ctx := context.Background()
@@ -130,9 +124,7 @@ var _ = Describe("Route Controller", func() {
 	// Route CRs are namespace-scoped — tenant namespace
 	const testNamespace = "dev"
 
-	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
-	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
 		const name = "shopping-app-route-basic"
@@ -188,7 +180,7 @@ var _ = Describe("Route Controller", func() {
 			domain := &FakeRouteDomain{}
 			reconciler := newRouteReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})
@@ -218,7 +210,6 @@ var _ = Describe("Route Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// TLS + RUNTIME ROUTING
 	// Route fields: host, path, enabled, tlsEnabled, runtime.
 	// Not build strategies — fixed from the copy-paste.
@@ -230,7 +221,6 @@ var _ = Describe("Route Controller", func() {
 	// Runtime:
 	//   kubernetes.io/container-runtime — default, Kourier or nginx
 	//   knative.io/serving              — scale-to-zero, DomainMapping
-	// -------------------------------------------------------------------------
 
 	Context("Route TLS and runtime routing", func() {
 		type routeTestCase struct {
@@ -340,9 +330,7 @@ var _ = Describe("Route Controller", func() {
 		)
 	})
 
-	// -------------------------------------------------------------------------
 	// PATH ROUTING
-	// -------------------------------------------------------------------------
 
 	Context("Route path routing", func() {
 		It("carries the path through to the domain for sub-path routes", func() {
@@ -383,9 +371,7 @@ var _ = Describe("Route Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// NOT FOUND — CR deleted before reconcile loop runs
-	// -------------------------------------------------------------------------
 
 	Context("Route not found", func() {
 		It("returns no error when the Route CR no longer exists", func() {

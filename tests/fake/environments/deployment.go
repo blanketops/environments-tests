@@ -42,12 +42,10 @@ import (
 	testdata "github.com/blanketops/environments-tests/tests/data/environments"
 )
 
-// -----------------------------------------------------------------------------
 // Fake Deployment Domain (correct seam)
 //
 // This is the ONLY thing we fake.
 // The controller, registry, engine, and command flow are all real.
-// -----------------------------------------------------------------------------
 
 type FakeDeploymentDomain struct {
 	Called bool
@@ -73,9 +71,7 @@ func (f *FakeDeploymentDomain) GVK() schema.GroupVersionKind {
 
 // Note: testLogger is declared in build_controller_test.go — same package, no redeclaration.
 
-// -----------------------------------------------------------------------------
 // Test helpers
-// -----------------------------------------------------------------------------
 
 func newDeploymentReconciler(domain *FakeDeploymentDomain) *envctrl.DeploymentReconciler {
 	reg := registry.NewRegistry()
@@ -115,18 +111,14 @@ func deploymentFromData(d *testdata.DeploymentData) *environmentsv1alpha1.Deploy
 	}
 }
 
-// -----------------------------------------------------------------------------
 // Deployment Controller Tests
-// -----------------------------------------------------------------------------
 
 var _ = Describe("Deployment Controller", func() {
 	ctx := context.Background()
 
 	const testNamespace = "default"
 
-	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
-	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
 		const name = "test-deployment-basic"
@@ -182,7 +174,7 @@ var _ = Describe("Deployment Controller", func() {
 			domain := &FakeDeploymentDomain{}
 			reconciler := newDeploymentReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})
@@ -212,11 +204,9 @@ var _ = Describe("Deployment Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// ROLLOUT STRATEGY ROUTING
 	// Deployment strategies are Rolling | Canary | BlueGreen —
 	// not build strategies. These were copy-pasted from Build and fixed here.
-	// -------------------------------------------------------------------------
 
 	Context("Deployment rollout strategy routing", func() {
 		type deploymentTestCase struct {
@@ -299,9 +289,7 @@ var _ = Describe("Deployment Controller", func() {
 		)
 	})
 
-	// -------------------------------------------------------------------------
 	// RUNTIME ROUTING
-	// -------------------------------------------------------------------------
 
 	Context("Deployment runtime routing", func() {
 		type runtimeTestCase struct {
@@ -363,9 +351,7 @@ var _ = Describe("Deployment Controller", func() {
 		)
 	})
 
-	// -------------------------------------------------------------------------
 	// MULTI-UNIT DEPLOYMENT
-	// -------------------------------------------------------------------------
 
 	Context("Multi-unit deployment", func() {
 		It("routes a Deployment with multiple ServiceUnits through the domain", func() {
@@ -410,9 +396,7 @@ var _ = Describe("Deployment Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// NOT FOUND — CR deleted before reconcile loop runs
-	// -------------------------------------------------------------------------
 
 	Context("Deployment not found", func() {
 		It("returns no error when the Deployment CR no longer exists", func() {

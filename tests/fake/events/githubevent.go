@@ -44,7 +44,6 @@ import (
 	testdata "github.com/blanketops/environments-tests/tests/data/events"
 )
 
-// -----------------------------------------------------------------------------
 // Fake GitHubEvent Domain (correct seam)
 //
 // This is the ONLY thing we fake.
@@ -54,7 +53,6 @@ import (
 //   EventSource, EventBus, Sensor — all owned by the GitHubEvent CR.
 // We test only that the domain receives the correct CR — child resource
 // reconciliation is covered in integration tests.
-// -----------------------------------------------------------------------------
 
 type FakeGitHubEventDomain struct {
 	Called bool
@@ -82,9 +80,7 @@ func (f *FakeGitHubEventDomain) GVK() schema.GroupVersionKind {
 // Declared per-package — separate from the environments package testLogger.
 var githubEventTestLogger = logr.Discard()
 
-// -----------------------------------------------------------------------------
 // Test helpers
-// -----------------------------------------------------------------------------
 
 func newGitHubEventReconciler(domain *FakeGitHubEventDomain) *envctrl.GitHubEventReconciler {
 	reg := registry.NewRegistry()
@@ -124,9 +120,7 @@ func gitHubEventFromData(d *testdata.GitHubEventData) *eventsv1alpha1.GitHubEven
 	}
 }
 
-// -----------------------------------------------------------------------------
 // GitHubEvent Controller Tests
-// -----------------------------------------------------------------------------
 
 var _ = Describe("GitHubEvent Controller", func() {
 	ctx := context.Background()
@@ -135,9 +129,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 	// Argo Events controller watches this namespace.
 	const testNamespace = "argo-events"
 
-	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
-	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
 		const name = "push-main-basic"
@@ -193,7 +185,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 			domain := &FakeGitHubEventDomain{}
 			reconciler := newGitHubEventReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})
@@ -223,11 +215,9 @@ var _ = Describe("GitHubEvent Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// EVENT TYPE ROUTING
 	// GitHubEvent types are push | pull_request —
 	// not build strategies. Fixed from the copy-paste.
-	// -------------------------------------------------------------------------
 
 	Context("GitHubEvent type routing", func() {
 		type gitHubEventTestCase struct {
@@ -314,11 +304,9 @@ var _ = Describe("GitHubEvent Controller", func() {
 		)
 	})
 
-	// -------------------------------------------------------------------------
 	// WEBHOOK SECRET REF
 	// Controller must not process events without a webhook secret ref —
 	// payload signature verification depends on it.
-	// -------------------------------------------------------------------------
 
 	Context("GitHubEvent webhook secret ref", func() {
 		It("carries the webhook secretRef name and key through to the domain", func() {
@@ -358,9 +346,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// NOT FOUND — CR deleted before reconcile loop runs
-	// -------------------------------------------------------------------------
 
 	Context("GitHubEvent not found", func() {
 		It("returns no error when the GitHubEvent CR no longer exists", func() {

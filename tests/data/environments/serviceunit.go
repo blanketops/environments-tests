@@ -164,12 +164,10 @@ const (
 	ServiceUnitStatusPhaseFailed ServiceUnitStatusPhase = "Failed"
 )
 
-// -----------------------------------------------------------------------------
 // Test fixtures
-// -----------------------------------------------------------------------------
 
 // newServiceUnitBase returns a base ServiceUnitData with shared labels.
-func newServiceUnitBase(name, namespace, envName, appLabel string) *ServiceUnitData {
+func newServiceUnitBase(name, namespace, envName string) *ServiceUnitData {
 	return &ServiceUnitData{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "environments.blanketops.dev/v1alpha1",
@@ -198,7 +196,7 @@ func newServiceUnitBase(name, namespace, envName, appLabel string) *ServiceUnitD
 // for-kaniko-app-api static web unit.
 // Matches: environments.blanketops.dev/v1alpha1 ServiceUnit for-kaniko-app-api
 func NewStaticServiceUnitData(name, namespace, envName string) *ServiceUnitData {
-	su := newServiceUnitBase(name, namespace, envName, "api")
+	su := newServiceUnitBase(name, namespace, envName)
 	su.Spec = ServiceUnitSpec{
 		Contract: ServiceUnitContract{
 			Type:          ServiceUnitTypeStatic,
@@ -216,7 +214,7 @@ func NewStaticServiceUnitData(name, namespace, envName string) *ServiceUnitData 
 // for-kaniko-app-worker build unit — image resolved from a Build CR.
 // Matches: environments.blanketops.dev/v1alpha1 ServiceUnit for-kaniko-app-worker
 func NewBuildServiceUnitData(name, namespace, envName string) *ServiceUnitData {
-	su := newServiceUnitBase(name, namespace, envName, "worker")
+	su := newServiceUnitBase(name, namespace, envName)
 	su.Spec = ServiceUnitSpec{
 		Contract: ServiceUnitContract{
 			Type: ServiceUnitTypeBuild,
@@ -235,7 +233,7 @@ func NewBuildServiceUnitData(name, namespace, envName string) *ServiceUnitData {
 // NewAPIServiceUnitData returns a ServiceUnitData for a Go API unit.
 // Useful for testing multi-stack environments.
 func NewAPIServiceUnitData(name, namespace, envName string) *ServiceUnitData {
-	su := newServiceUnitBase(name, namespace, envName, "api")
+	su := newServiceUnitBase(name, namespace, envName)
 	su.Spec = ServiceUnitSpec{
 		Contract: ServiceUnitContract{
 			Type:          ServiceUnitTypeStatic,

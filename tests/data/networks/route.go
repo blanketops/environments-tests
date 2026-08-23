@@ -127,9 +127,7 @@ const (
 	RoutePhaseFailed RoutePhase = "Failed"
 )
 
-// -----------------------------------------------------------------------------
 // Test fixtures
-// -----------------------------------------------------------------------------
 
 // NewRouteData returns a RouteData for a platform domain route.
 // Platform domain: *.dev.domain.co.za — covered by wildcard DNS01 cert.
@@ -170,7 +168,7 @@ func NewRouteData(name, namespace, host, envName string) *RouteData {
 // Custom domain: client-a.co.za — triggers HTTP01 Issuer per tenant namespace.
 func NewCustomDomainRouteData(name, namespace, host, envName string) *RouteData {
 	r := NewRouteData(name, namespace, host, envName)
-	r.ObjectMeta.Labels["environments.blanketops.dev/type"] = "production"
+	r.Labels["environments.blanketops.dev/type"] = "production"
 	return r
 }
 

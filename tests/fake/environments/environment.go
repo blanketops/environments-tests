@@ -40,9 +40,7 @@ import (
 	"github.com/blanketops/environments/core/registry"
 )
 
-// -----------------------------------------------------------------------------
 // Fake Environment Domain (CORRECT seam)
-// -----------------------------------------------------------------------------
 //
 // This is the ONLY thing we fake.
 // The controller, registry, engine, and command flow are real.
@@ -71,9 +69,7 @@ func (f *FakeEnvironmentDomain) GVK() schema.GroupVersionKind {
 // Note: testLogger is declared in build.go — same package, no redeclaration.
 
 //
-// -----------------------------------------------------------------------------
 // Test helpers
-// -----------------------------------------------------------------------------
 
 func newEnvironmentTestReconciler(domain *FakeEnvironmentDomain) *envctrl.EnvironmentReconciler {
 	reg := registry.NewRegistry()
@@ -133,16 +129,12 @@ func validEnvironment(name string, environmentType string) *environmentsv1alpha1
 }
 
 //
-// -----------------------------------------------------------------------------
 // Environment Controller Tests
-// -----------------------------------------------------------------------------
 
 var _ = Describe("Environment Controller", func() {
 	ctx := context.Background()
 
-	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
-	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
 		const name = "test-environment-basic"
@@ -188,7 +180,7 @@ var _ = Describe("Environment Controller", func() {
 			domain := &FakeEnvironmentDomain{}
 			reconciler := newEnvironmentTestReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})
@@ -201,7 +193,7 @@ var _ = Describe("Environment Controller", func() {
 
 		It("returns an error when the Environment domain fails", func() {
 			domain := &FakeEnvironmentDomain{
-				Err: fmt.Errorf("Environment domain failure"),
+				Err: fmt.Errorf("environment domain failure"),
 			}
 			reconciler := newEnvironmentTestReconciler(domain)
 
@@ -214,9 +206,7 @@ var _ = Describe("Environment Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// STRATEGY ROUTING
-	// -------------------------------------------------------------------------
 
 	Context("Environment type routing", func() {
 		type testCase struct {

@@ -44,7 +44,6 @@ import (
 	testdata "github.com/blanketops/environments-tests/tests/data/networks"
 )
 
-// -----------------------------------------------------------------------------
 // Fake Domain Domain (correct seam)
 //
 // This is the ONLY thing we fake.
@@ -55,7 +54,6 @@ import (
 //   custom  TLS:  Issuer + DomainClaim + DomainMapping + Certificate
 // We test only that the domain receives the correct CR — child resource
 // reconciliation is covered in integration tests.
-// -----------------------------------------------------------------------------
 
 type FakeDomainDomain struct {
 	Called bool
@@ -83,9 +81,7 @@ func (f *FakeDomainDomain) GVK() schema.GroupVersionKind {
 // Declared per-package — separate from environments and events packages.
 var domainTestLogger = logr.Discard()
 
-// -----------------------------------------------------------------------------
 // Test helpers
-// -----------------------------------------------------------------------------
 
 func newDomainReconciler(domain *FakeDomainDomain) *envctrl.DomainReconciler {
 	reg := registry.NewRegistry()
@@ -125,9 +121,7 @@ func domainFromData(d *testdata.DomainData) *networksv1alpha1.Domain {
 	}
 }
 
-// -----------------------------------------------------------------------------
 // Domain Controller Tests
-// -----------------------------------------------------------------------------
 
 var _ = Describe("Domain Controller", func() {
 	ctx := context.Background()
@@ -135,9 +129,7 @@ var _ = Describe("Domain Controller", func() {
 	// Domain CRs are namespace-scoped — tenant namespace
 	const testNamespace = "dev"
 
-	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
-	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
 		const name = "domain-for-kaniko-basic"
@@ -198,7 +190,7 @@ var _ = Describe("Domain Controller", func() {
 			domain := &FakeDomainDomain{}
 			reconciler := newDomainReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})
@@ -228,7 +220,6 @@ var _ = Describe("Domain Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// TLS STRATEGY ROUTING
 	// Domain TLS strategies are platform | custom —
 	// not build strategies. Fixed from the copy-paste.
@@ -237,7 +228,6 @@ var _ = Describe("Domain Controller", func() {
 	//           Controller emits DomainClaim + DomainMapping only.
 	// custom:   client-owned zone — HTTP01 challenge.
 	//           Controller emits Issuer + DomainClaim + DomainMapping + Certificate.
-	// -------------------------------------------------------------------------
 
 	Context("Domain TLS strategy routing", func() {
 		type domainTestCase struct {
@@ -333,11 +323,9 @@ var _ = Describe("Domain Controller", func() {
 		)
 	})
 
-	// -------------------------------------------------------------------------
 	// ROUTE REF
 	// Domain must carry a valid routeRef — Route owns the workload binding.
 	// Domain owns the cert/mapping chain for the host.
-	// -------------------------------------------------------------------------
 
 	Context("Domain routeRef", func() {
 		It("carries the routeRef name through to the domain", func() {
@@ -382,9 +370,7 @@ var _ = Describe("Domain Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// NOT FOUND — CR deleted before reconcile loop runs
-	// -------------------------------------------------------------------------
 
 	Context("Domain not found", func() {
 		It("returns no error when the Domain CR no longer exists", func() {

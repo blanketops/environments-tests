@@ -44,7 +44,6 @@ import (
 	testdata "github.com/blanketops/environments-tests/tests/data/sources"
 )
 
-// -----------------------------------------------------------------------------
 // Fake GitRepository Domain (correct seam)
 //
 // This is the ONLY thing we fake.
@@ -53,7 +52,6 @@ import (
 // The GitRepository controller reconciles a Crossplane GitHub webhook provider
 // resource as an owned child — registering the webhook on GitHub via the API.
 // We test only that the domain receives the correct CR.
-// -----------------------------------------------------------------------------
 
 type FakeGitRepositoryDomain struct {
 	Called bool
@@ -81,9 +79,7 @@ func (f *FakeGitRepositoryDomain) GVK() schema.GroupVersionKind {
 // Declared per-package — separate from environments, events, and networks packages.
 var gitRepositoryTestLogger = logr.Discard()
 
-// -----------------------------------------------------------------------------
 // Test helpers
-// -----------------------------------------------------------------------------
 
 func newGitRepositoryReconciler(domain *FakeGitRepositoryDomain) *envctrl.GitRepositoryReconciler {
 	reg := registry.NewRegistry()
@@ -128,9 +124,7 @@ func gitRepositoryFromData(d *testdata.GitRepositoryData) *sourcesv1alpha1.GitRe
 	}
 }
 
-// -----------------------------------------------------------------------------
 // GitRepository Controller Tests
-// -----------------------------------------------------------------------------
 
 var _ = Describe("GitRepository Controller", func() {
 	ctx := context.Background()
@@ -138,9 +132,7 @@ var _ = Describe("GitRepository Controller", func() {
 	// GitRepository CRs are namespace-scoped.
 	const testNamespace = "default"
 
-	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
-	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
 		const name = "for-kaniko-app-basic"
@@ -196,7 +188,7 @@ var _ = Describe("GitRepository Controller", func() {
 			domain := &FakeGitRepositoryDomain{}
 			reconciler := newGitRepositoryReconciler(domain)
 
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
 				})
@@ -226,11 +218,9 @@ var _ = Describe("GitRepository Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// WEBHOOK EVENT ROUTING
 	// GitRepository webhook events are push | pull_request —
 	// not build strategies. Fixed from the copy-paste.
-	// -------------------------------------------------------------------------
 
 	Context("GitRepository webhook event routing", func() {
 		type gitRepositoryTestCase struct {
@@ -260,7 +250,8 @@ var _ = Describe("GitRepository Controller", func() {
 					gr := &sourcesv1alpha1.GitRepository{}
 					if err := k8sClient.Get(ctx, key, gr); err == nil {
 						_ = k8sClient.Delete(ctx, gr)
-						_, _ = newGitRepositoryReconciler(&FakeGitRepositoryDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
+						cleanupReconciler := newGitRepositoryReconciler(&FakeGitRepositoryDomain{})
+						_, _ = cleanupReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 					}
 				})
 
@@ -325,9 +316,7 @@ var _ = Describe("GitRepository Controller", func() {
 		)
 	})
 
-	// -------------------------------------------------------------------------
 	// REPOSITORY OWNER AND NAME
-	// -------------------------------------------------------------------------
 
 	Context("GitRepository owner and name", func() {
 		It("carries the repository owner and name through to the domain", func() {
@@ -341,7 +330,8 @@ var _ = Describe("GitRepository Controller", func() {
 				gr := &sourcesv1alpha1.GitRepository{}
 				if err := k8sClient.Get(ctx, key, gr); err == nil {
 					_ = k8sClient.Delete(ctx, gr)
-					_, _ = newGitRepositoryReconciler(&FakeGitRepositoryDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
+					cleanupReconciler := newGitRepositoryReconciler(&FakeGitRepositoryDomain{})
+					_, _ = cleanupReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				}
 			})
 
@@ -368,9 +358,7 @@ var _ = Describe("GitRepository Controller", func() {
 		})
 	})
 
-	// -------------------------------------------------------------------------
 	// NOT FOUND — CR deleted before reconcile loop runs
-	// -------------------------------------------------------------------------
 
 	Context("GitRepository not found", func() {
 		It("returns no error when the GitRepository CR no longer exists", func() {
