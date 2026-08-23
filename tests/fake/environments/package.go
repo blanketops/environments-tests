@@ -17,23 +17,29 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	environmentsv1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	environmentsv1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/environments"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 
 	// test data — apimachinery types we built
-	testdata "github.com/blanketops-environments-tests/tests/data/environments"
+	testdata "github.com/blanketops/environments-tests/tests/data/environments"
 )
 
 // -----------------------------------------------------------------------------
@@ -45,7 +51,7 @@ import (
 
 type FakePackageDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -55,7 +61,7 @@ func (f *FakePackageDomain) CanUpdate(obj client.Object, old client.Object) bool
 	return true
 }
 
-func (f *FakePackageDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakePackageDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -71,60 +77,40 @@ func (f *FakePackageDomain) GVK() schema.GroupVersionKind {
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newPackageReconciler(domain *FakePackageDomain) *PackageReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newPackageReconciler(domain *FakePackageDomain) *envctrl.PackageReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		environmentsv1.GroupVersion.WithKind("Package"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, testLogger)
+	eng := engine.NewEngine(reg, testLogger)
 
-	return &PackageReconciler{
+	return &envctrl.PackageReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32),
+		Recorder: events.NewFakeRecorder(32),
 	}
 }
 
 // packageFromData converts a testdata.PackageData into the API type
 // the controller expects. Single conversion point — nothing scattered across tests.
+//
+// Package.Spec is an opaque contract (Spec.Contract runtime.RawExtension) —
+// the resolver parses it as raw JSON, not typed Go struct fields. testdata's
+// PackageContract already carries the correct json tags for that raw
+// contract shape, so this just marshals it directly.
 func packageFromData(d *testdata.PackageData) *environmentsv1.Package {
+	raw, err := json.Marshal(d.Spec.Contract)
+	if err != nil {
+		panic(fmt.Sprintf("marshal package contract: %v", err))
+	}
 	return &environmentsv1.Package{
 		ObjectMeta: d.ObjectMeta,
 		Spec: environmentsv1.PackageSpec{
-			Contract: environmentsv1.PackageContract{
-				Name:               d.Spec.Contract.Name,
-				Version:            d.Spec.Contract.Version,
-				Enabled:            d.Spec.Contract.Enabled,
-				PackageName:        d.Spec.Contract.PackageName,
-				PackageVersion:     d.Spec.Contract.PackageVersion,
-				PackageDescription: d.Spec.Contract.PackageDescription,
-				PackageMaintainers: func() []environmentsv1.PackageMaintainer {
-					out := make([]environmentsv1.PackageMaintainer, len(d.Spec.Contract.PackageMaintainers))
-					for i, m := range d.Spec.Contract.PackageMaintainers {
-						out[i] = environmentsv1.PackageMaintainer{
-							Name:  m.Name,
-							Email: m.Email,
-						}
-					}
-					return out
-				}(),
-				PackageRepository: environmentsv1.PackageRepository{
-					URL:               d.Spec.Contract.PackageRepository.URL,
-					CredentialsSecret: d.Spec.Contract.PackageRepository.CredentialsSecret,
-				},
-				PackageKappDiff: d.Spec.Contract.PackageKappDiff,
-				StateRepo: environmentsv1.StateRepo{
-					URL:         d.Spec.Contract.StateRepo.URL,
-					Ref:         environmentsv1.StateRepoRef{Branch: d.Spec.Contract.StateRepo.Ref.Branch},
-					CloneSecret: d.Spec.Contract.StateRepo.CloneSecret,
-					Strategy:    d.Spec.Contract.StateRepo.Strategy,
-					Path:        d.Spec.Contract.StateRepo.Path,
-				},
-			},
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
 }
@@ -179,7 +165,7 @@ var _ = Describe("Package Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 			Expect(domain.Cmd.GVK.Kind).To(Equal("Package"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
@@ -195,7 +181,7 @@ var _ = Describe("Package Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the Package domain fails", func() {
@@ -262,15 +248,18 @@ var _ = Describe("Package Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("Package"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
 				pkgObj, ok := cmd.Obj.(*environmentsv1.Package)
 				Expect(ok).To(BeTrue())
-				Expect(pkgObj.Spec.Contract.StateRepo.Strategy).To(Equal(tc.strategy))
-				Expect(pkgObj.Spec.Contract.PackageKappDiff).To(Equal(tc.kappDiff))
-				Expect(pkgObj.Spec.Contract.StateRepo.Ref.Branch).To(Equal(tc.stateBranch))
-				Expect(pkgObj.Spec.Contract.StateRepo.Path).To(Equal(tc.statePath))
-				Expect(pkgObj.Spec.Contract.PackageRepository.CredentialsSecret).To(Equal("git-ssh-credentials-packages"))
+
+				var contract testdata.PackageContract
+				Expect(json.Unmarshal(pkgObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(contract.StateRepo.Strategy).To(Equal(tc.strategy))
+				Expect(contract.PackageKappDiff).To(Equal(tc.kappDiff))
+				Expect(contract.StateRepo.Ref.Branch).To(Equal(tc.stateBranch))
+				Expect(contract.StateRepo.Path).To(Equal(tc.statePath))
+				Expect(contract.PackageRepository.CredentialsSecret).To(Equal("git-ssh-credentials-packages"))
 			},
 
 			Entry("kustomization — kapp-diff enabled", packageTestCase{
@@ -327,8 +316,11 @@ var _ = Describe("Package Controller", func() {
 
 			pkgObj, ok := domain.Cmd.Obj.(*environmentsv1.Package)
 			Expect(ok).To(BeTrue())
+
+			var contract testdata.PackageContract
+			Expect(json.Unmarshal(pkgObj.Spec.Contract.Raw, &contract)).To(Succeed())
 			// Domain receives the disabled Package — suspension logic lives in domain
-			Expect(pkgObj.Spec.Contract.Enabled).To(BeFalse())
+			Expect(contract.Enabled).To(BeFalse())
 		})
 	})
 
@@ -361,10 +353,13 @@ var _ = Describe("Package Controller", func() {
 
 			pkgObj, ok := domain.Cmd.Obj.(*environmentsv1.Package)
 			Expect(ok).To(BeTrue())
-			Expect(pkgObj.Spec.Contract.PackageMaintainers).To(HaveLen(1))
-			Expect(pkgObj.Spec.Contract.PackageMaintainers[0].Name).To(Equal("Neo"))
-			Expect(pkgObj.Spec.Contract.PackageMaintainers[0].Email).To(Equal("neo@blanketops.online"))
-			Expect(pkgObj.Spec.Contract.PackageVersion).To(Equal("v1.2.3"))
+
+			var contract testdata.PackageContract
+			Expect(json.Unmarshal(pkgObj.Spec.Contract.Raw, &contract)).To(Succeed())
+			Expect(contract.PackageMaintainers).To(HaveLen(1))
+			Expect(contract.PackageMaintainers[0].Name).To(Equal("Neo"))
+			Expect(contract.PackageMaintainers[0].Email).To(Equal("neo@blanketops.online"))
+			Expect(contract.PackageVersion).To(Equal("v1.2.3"))
 		})
 	})
 

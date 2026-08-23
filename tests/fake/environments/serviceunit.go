@@ -17,23 +17,29 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/environments"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 
 	// test data — apimachinery types we built
-	testdata "github.com/blanketops-environments-tests/tests/data/environments"
+	testdata "github.com/blanketops/environments-tests/tests/data/environments"
 )
 
 // -----------------------------------------------------------------------------
@@ -45,7 +51,7 @@ import (
 
 type FakeServiceUnitDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -55,7 +61,7 @@ func (f *FakeServiceUnitDomain) CanUpdate(obj client.Object, old client.Object) 
 	return true
 }
 
-func (f *FakeServiceUnitDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeServiceUnitDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -71,51 +77,43 @@ func (f *FakeServiceUnitDomain) GVK() schema.GroupVersionKind {
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newServiceUnitReconciler(domain *FakeServiceUnitDomain) *ServiceUnitReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newServiceUnitReconciler(domain *FakeServiceUnitDomain) *envctrl.ServiceUnitReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		environmentsv1alpha1.GroupVersion.WithKind("ServiceUnit"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, testLogger)
+	eng := engine.NewEngine(reg, testLogger)
 
-	return &ServiceUnitReconciler{
+	return &envctrl.ServiceUnitReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32),
+		Recorder: events.NewFakeRecorder(32),
 	}
 }
 
 // serviceUnitFromData converts a testdata.ServiceUnitData into the API type
 // the controller expects. Single conversion point — nothing scattered across tests.
+//
+// ServiceUnit.Spec is an opaque contract (Spec.Contract runtime.RawExtension)
+// — the resolver parses it as raw JSON, not typed Go struct fields.
+// testdata's ServiceUnitContract already carries the correct json tags
+// (including the static-image vs build-ref distinction) for that raw
+// contract shape, so this just marshals it directly.
 func serviceUnitFromData(d *testdata.ServiceUnitData) *environmentsv1alpha1.ServiceUnit {
-	su := &environmentsv1alpha1.ServiceUnit{
+	raw, err := json.Marshal(d.Spec.Contract)
+	if err != nil {
+		panic(fmt.Sprintf("marshal service unit contract: %v", err))
+	}
+	return &environmentsv1alpha1.ServiceUnit{
 		ObjectMeta: d.ObjectMeta,
 		Spec: environmentsv1alpha1.ServiceUnitSpec{
-			Contract: environmentsv1alpha1.ServiceUnitContract{
-				Type:          environmentsv1alpha1.ServiceUnitType(d.Spec.Contract.Type),
-				ContainerPort: d.Spec.Contract.ContainerPort,
-				Size:          d.Spec.Contract.Size,
-				AppType:       environmentsv1alpha1.ServiceUnitAppType(d.Spec.Contract.AppType),
-				StackType:     environmentsv1alpha1.ServiceUnitStackType(d.Spec.Contract.StackType),
-			},
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
-
-	// static: set image directly
-	// build: set buildRef — image resolved from BuildRun output
-	if d.Spec.Contract.Type == testdata.ServiceUnitTypeStatic {
-		su.Spec.Contract.Image = d.Spec.Contract.Image
-	} else if d.Spec.Contract.BuildRef != nil {
-		su.Spec.Contract.BuildRef = &environmentsv1alpha1.ServiceUnitBuildRef{
-			Name: d.Spec.Contract.BuildRef.Name,
-		}
-	}
-
-	return su
 }
 
 // -----------------------------------------------------------------------------
@@ -168,7 +166,7 @@ var _ = Describe("ServiceUnit Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 			Expect(domain.Cmd.GVK.Kind).To(Equal("ServiceUnit"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
@@ -184,7 +182,7 @@ var _ = Describe("ServiceUnit Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the ServiceUnit domain fails", func() {
@@ -257,15 +255,18 @@ var _ = Describe("ServiceUnit Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("ServiceUnit"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
 				suObj, ok := cmd.Obj.(*environmentsv1alpha1.ServiceUnit)
 				Expect(ok).To(BeTrue())
-				Expect(string(suObj.Spec.Contract.Type)).To(Equal(string(tc.unitType)))
-				Expect(string(suObj.Spec.Contract.AppType)).To(Equal(string(tc.appType)))
-				Expect(string(suObj.Spec.Contract.StackType)).To(Equal(string(tc.stackType)))
-				Expect(suObj.Spec.Contract.ContainerPort).To(Equal(tc.containerPort))
-				Expect(suObj.Spec.Contract.Size).To(Equal(tc.size))
+
+				var contract testdata.ServiceUnitContract
+				Expect(json.Unmarshal(suObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(string(contract.Type)).To(Equal(string(tc.unitType)))
+				Expect(string(contract.AppType)).To(Equal(string(tc.appType)))
+				Expect(string(contract.StackType)).To(Equal(string(tc.stackType)))
+				Expect(contract.ContainerPort).To(Equal(tc.containerPort))
+				Expect(contract.Size).To(Equal(tc.size))
 			},
 
 			// Matches real CR: serviceunit-for-kaniko-web-sample
@@ -327,11 +328,14 @@ var _ = Describe("ServiceUnit Controller", func() {
 
 			suObj, ok := domain.Cmd.Obj.(*environmentsv1alpha1.ServiceUnit)
 			Expect(ok).To(BeTrue())
-			Expect(string(suObj.Spec.Contract.Type)).To(Equal(string(testdata.ServiceUnitTypeBuild)))
-			Expect(suObj.Spec.Contract.BuildRef).NotTo(BeNil())
-			Expect(suObj.Spec.Contract.BuildRef.Name).To(Equal("for-kaniko-app"))
+
+			var contract testdata.ServiceUnitContract
+			Expect(json.Unmarshal(suObj.Spec.Contract.Raw, &contract)).To(Succeed())
+			Expect(string(contract.Type)).To(Equal(string(testdata.ServiceUnitTypeBuild)))
+			Expect(contract.BuildRef).NotTo(BeNil())
+			Expect(contract.BuildRef.Name).To(Equal("for-kaniko-app"))
 			// Image must be empty for build type — resolved from BuildRun output
-			Expect(suObj.Spec.Contract.Image).To(BeEmpty())
+			Expect(contract.Image).To(BeEmpty())
 		})
 
 		It("carries the image through to the domain for static-type units", func() {
@@ -358,10 +362,13 @@ var _ = Describe("ServiceUnit Controller", func() {
 
 			suObj, ok := domain.Cmd.Obj.(*environmentsv1alpha1.ServiceUnit)
 			Expect(ok).To(BeTrue())
-			Expect(string(suObj.Spec.Contract.Type)).To(Equal(string(testdata.ServiceUnitTypeStatic)))
-			Expect(suObj.Spec.Contract.Image).NotTo(BeEmpty())
+
+			var contract testdata.ServiceUnitContract
+			Expect(json.Unmarshal(suObj.Spec.Contract.Raw, &contract)).To(Succeed())
+			Expect(string(contract.Type)).To(Equal(string(testdata.ServiceUnitTypeStatic)))
+			Expect(contract.Image).NotTo(BeEmpty())
 			// BuildRef must be nil for static type — no Build CR dependency
-			Expect(suObj.Spec.Contract.BuildRef).To(BeNil())
+			Expect(contract.BuildRef).To(BeNil())
 		})
 	})
 

@@ -17,25 +17,31 @@ package events
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/go-logr/logr"
 
-	eventsv1alpha1 "github.com/BlanketOps/environments-api/api/events/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	eventsv1alpha1 "github.com/blanketops/environments-api/api/events/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/events"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 
 	// test data — apimachinery types we built
-	testdata "github.com/blanketops-environments-tests/tests/data/events"
+	testdata "github.com/blanketops/environments-tests/tests/data/events"
 )
 
 // -----------------------------------------------------------------------------
@@ -52,7 +58,7 @@ import (
 
 type FakeGitHubEventDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -62,7 +68,7 @@ func (f *FakeGitHubEventDomain) CanUpdate(obj client.Object, old client.Object) 
 	return true
 }
 
-func (f *FakeGitHubEventDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeGitHubEventDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -80,41 +86,40 @@ var githubEventTestLogger = logr.Discard()
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newGitHubEventReconciler(domain *FakeGitHubEventDomain) *GitHubEventReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newGitHubEventReconciler(domain *FakeGitHubEventDomain) *envctrl.GitHubEventReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		eventsv1alpha1.GroupVersion.WithKind("GitHubEvent"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, githubEventTestLogger)
+	eng := engine.NewEngine(reg, githubEventTestLogger)
 
-	return &GitHubEventReconciler{
+	return &envctrl.GitHubEventReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      githubEventTestLogger,
-		Recorder: record.NewFakeRecorder(32),
+		Recorder: events.NewFakeRecorder(32),
 	}
 }
 
 // gitHubEventFromData converts a testdata.GitHubEventData into the API type
 // the controller expects. Single conversion point — nothing scattered across tests.
+//
+// GitHubEvent.Spec is an opaque contract (Spec.Contract runtime.RawExtension)
+// — the resolver parses it as raw JSON, not typed Go struct fields.
+// testdata's GitHubEventContract already carries the correct json tags for
+// that raw contract shape, so this just marshals it directly.
 func gitHubEventFromData(d *testdata.GitHubEventData) *eventsv1alpha1.GitHubEvent {
+	raw, err := json.Marshal(d.Spec.Contract)
+	if err != nil {
+		panic(fmt.Sprintf("marshal githubevent contract: %v", err))
+	}
 	return &eventsv1alpha1.GitHubEvent{
 		ObjectMeta: d.ObjectMeta,
 		Spec: eventsv1alpha1.GitHubEventSpec{
-			Contract: eventsv1alpha1.GitHubEventContract{
-				Repository: d.Spec.Contract.Repository,
-				EventType:  eventsv1alpha1.GitHubEventType(d.Spec.Contract.EventType),
-				Ref:        d.Spec.Contract.Ref,
-				Webhook: eventsv1alpha1.Webhook{
-					SecretRef: eventsv1alpha1.SecretRef{
-						Name: d.Spec.Contract.Webhook.SecretRef.Name,
-						Key:  d.Spec.Contract.Webhook.SecretRef.Key,
-					},
-				},
-			},
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
 }
@@ -157,12 +162,21 @@ var _ = Describe("GitHubEvent Controller", func() {
 			ge := &eventsv1alpha1.GitHubEvent{}
 			if err := k8sClient.Get(ctx, key, ge); err == nil {
 				_ = k8sClient.Delete(ctx, ge)
+				// The real reconciler's finalizer gate runs regardless of which
+				// domain is injected — nothing else is watching this cluster
+				// during these tests, so drive the delete path once more here
+				// or the object is stuck in Terminating forever.
+				_, _ = newGitHubEventReconciler(&FakeGitHubEventDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			}
 		})
 
 		It("routes the GitHubEvent update through the engine to the GitHubEvent domain", func() {
 			domain := &FakeGitHubEventDomain{}
 			reconciler := newGitHubEventReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -171,7 +185,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 			Expect(domain.Cmd.GVK.Kind).To(Equal("GitHubEvent"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
@@ -187,7 +201,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the GitHubEvent domain fails", func() {
@@ -195,6 +209,10 @@ var _ = Describe("GitHubEvent Controller", func() {
 				Err: fmt.Errorf("githubevent domain failure"),
 			}
 			reconciler := newGitHubEventReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -236,11 +254,17 @@ var _ = Describe("GitHubEvent Controller", func() {
 					ge := &eventsv1alpha1.GitHubEvent{}
 					if err := k8sClient.Get(ctx, key, ge); err == nil {
 						_ = k8sClient.Delete(ctx, ge)
+						_, _ = newGitHubEventReconciler(&FakeGitHubEventDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 					}
 				})
 
 				domain := &FakeGitHubEventDomain{}
 				reconciler := newGitHubEventReconciler(domain)
+
+				// First reconcile on a brand-new object only adds the
+				// finalizer and returns — the domain isn't invoked until
+				// the next pass.
+				_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -251,17 +275,20 @@ var _ = Describe("GitHubEvent Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("GitHubEvent"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
 				geObj, ok := cmd.Obj.(*eventsv1alpha1.GitHubEvent)
 				Expect(ok).To(BeTrue())
-				Expect(string(geObj.Spec.Contract.EventType)).To(Equal(string(tc.eventType)))
-				Expect(geObj.Spec.Contract.Ref).To(Equal(tc.ref))
+
+				var contract testdata.GitHubEventContract
+				Expect(json.Unmarshal(geObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(string(contract.EventType)).To(Equal(string(tc.eventType)))
+				Expect(contract.Ref).To(Equal(tc.ref))
 				// Repository must always be owner/name format
-				Expect(geObj.Spec.Contract.Repository).To(Equal("ntlaletsi70/" + tc.envName))
+				Expect(contract.Repository).To(Equal("ntlaletsi70/" + tc.envName))
 				// Webhook secret ref must be present
-				Expect(geObj.Spec.Contract.Webhook.SecretRef.Name).To(Equal("github-webhook-secret"))
-				Expect(geObj.Spec.Contract.Webhook.SecretRef.Key).To(Equal("secret"))
+				Expect(contract.Webhook.SecretRef.Name).To(Equal("github-webhook-secret"))
+				Expect(contract.Webhook.SecretRef.Key).To(Equal("secret"))
 			},
 
 			// Matches real CR: push-main-001
@@ -304,11 +331,16 @@ var _ = Describe("GitHubEvent Controller", func() {
 				ge := &eventsv1alpha1.GitHubEvent{}
 				if err := k8sClient.Get(ctx, key, ge); err == nil {
 					_ = k8sClient.Delete(ctx, ge)
+					_, _ = newGitHubEventReconciler(&FakeGitHubEventDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				}
 			})
 
 			domain := &FakeGitHubEventDomain{}
 			reconciler := newGitHubEventReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -318,8 +350,11 @@ var _ = Describe("GitHubEvent Controller", func() {
 
 			geObj, ok := domain.Cmd.Obj.(*eventsv1alpha1.GitHubEvent)
 			Expect(ok).To(BeTrue())
-			Expect(geObj.Spec.Contract.Webhook.SecretRef.Name).To(Equal("github-webhook-secret"))
-			Expect(geObj.Spec.Contract.Webhook.SecretRef.Key).To(Equal("secret"))
+
+			var contract testdata.GitHubEventContract
+			Expect(json.Unmarshal(geObj.Spec.Contract.Raw, &contract)).To(Succeed())
+			Expect(contract.Webhook.SecretRef.Name).To(Equal("github-webhook-secret"))
+			Expect(contract.Webhook.SecretRef.Key).To(Equal("secret"))
 		})
 	})
 

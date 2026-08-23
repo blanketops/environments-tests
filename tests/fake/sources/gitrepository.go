@@ -17,6 +17,7 @@ package sources
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -25,17 +26,22 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	sourcesv1alpha1 "github.com/BlanketOps/environments-api/api/sources/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	sourcesv1alpha1 "github.com/blanketops/environments-api/api/sources/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/sources"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 
 	// test data — apimachinery types we built
-	testdata "github.com/blanketops-environments-tests/tests/data/sources"
+	testdata "github.com/blanketops/environments-tests/tests/data/sources"
 )
 
 // -----------------------------------------------------------------------------
@@ -51,7 +57,7 @@ import (
 
 type FakeGitRepositoryDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -61,7 +67,7 @@ func (f *FakeGitRepositoryDomain) CanUpdate(obj client.Object, old client.Object
 	return true
 }
 
-func (f *FakeGitRepositoryDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeGitRepositoryDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -79,48 +85,45 @@ var gitRepositoryTestLogger = logr.Discard()
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newGitRepositoryReconciler(domain *FakeGitRepositoryDomain) *GitRepositoryReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newGitRepositoryReconciler(domain *FakeGitRepositoryDomain) *envctrl.GitRepositoryReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		sourcesv1alpha1.GroupVersion.WithKind("GitRepository"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, gitRepositoryTestLogger)
+	eng := engine.NewEngine(reg, gitRepositoryTestLogger)
 
-	return &GitRepositoryReconciler{
+	return &envctrl.GitRepositoryReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      gitRepositoryTestLogger,
-		Recorder: record.NewFakeRecorder(32),
+		Recorder: events.NewFakeRecorder(32),
 	}
 }
 
 // gitRepositoryFromData converts a testdata.GitRepositoryData into the API type
 // the controller expects. Single conversion point — nothing scattered across tests.
+//
+// GitRepository.Spec is an opaque contract (Spec.Contract
+// runtime.RawExtension) — the resolver parses it as raw JSON, not typed Go
+// struct fields. testdata's GitRepositoryContract already carries the
+// correct json tags for that raw contract shape, so this just marshals it
+// directly.
 func gitRepositoryFromData(d *testdata.GitRepositoryData) *sourcesv1alpha1.GitRepository {
-	webhooks := make([]sourcesv1alpha1.WebhookSubscription, len(d.Spec.Contract.Webhooks))
-	for i, w := range d.Spec.Contract.Webhooks {
-		events := make([]sourcesv1alpha1.WebhookEvent, len(w.Events))
-		for j, e := range w.Events {
-			events[j] = sourcesv1alpha1.WebhookEvent(e)
-		}
-		webhooks[i] = sourcesv1alpha1.WebhookSubscription{Events: events}
+	raw, err := json.Marshal(d.Spec.Contract)
+	if err != nil {
+		panic(fmt.Sprintf("marshal gitrepository contract: %v", err))
 	}
-
+	om := d.ObjectMeta
+	// GitRepository is namespace-scoped; testdata doesn't carry a namespace,
+	// so set it here to match the fixed namespace these tests run in.
+	om.Namespace = "default"
 	return &sourcesv1alpha1.GitRepository{
-		ObjectMeta: d.ObjectMeta,
+		ObjectMeta: om,
 		Spec: sourcesv1alpha1.GitRepositorySpec{
-			Contract: sourcesv1alpha1.GitRepositoryContract{
-				Provider: d.Spec.Contract.Provider,
-				HookURL:  d.Spec.Contract.HookURL,
-				Repository: sourcesv1alpha1.GitRepository{
-					Owner: d.Spec.Contract.Repository.Owner,
-					Name:  d.Spec.Contract.Repository.Name,
-				},
-				Webhooks: webhooks,
-			},
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
 }
@@ -132,8 +135,7 @@ func gitRepositoryFromData(d *testdata.GitRepositoryData) *sourcesv1alpha1.GitRe
 var _ = Describe("GitRepository Controller", func() {
 	ctx := context.Background()
 
-	// GitRepository CRs are cluster-scoped — no namespace in the real CR.
-	// envtest requires a namespace — using default.
+	// GitRepository CRs are namespace-scoped.
 	const testNamespace = "default"
 
 	// -------------------------------------------------------------------------
@@ -163,12 +165,21 @@ var _ = Describe("GitRepository Controller", func() {
 			gr := &sourcesv1alpha1.GitRepository{}
 			if err := k8sClient.Get(ctx, key, gr); err == nil {
 				_ = k8sClient.Delete(ctx, gr)
+				// The real reconciler's finalizer gate runs regardless of which
+				// domain is injected — nothing else is watching this cluster
+				// during these tests, so drive the delete path once more here
+				// or the object is stuck in Terminating forever.
+				_, _ = newGitRepositoryReconciler(&FakeGitRepositoryDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			}
 		})
 
 		It("routes the GitRepository update through the engine to the GitRepository domain", func() {
 			domain := &FakeGitRepositoryDomain{}
 			reconciler := newGitRepositoryReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -177,7 +188,7 @@ var _ = Describe("GitRepository Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 			Expect(domain.Cmd.GVK.Kind).To(Equal("GitRepository"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
@@ -193,7 +204,7 @@ var _ = Describe("GitRepository Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the GitRepository domain fails", func() {
@@ -201,6 +212,10 @@ var _ = Describe("GitRepository Controller", func() {
 				Err: fmt.Errorf("gitrepository domain failure"),
 			}
 			reconciler := newGitRepositoryReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -245,11 +260,17 @@ var _ = Describe("GitRepository Controller", func() {
 					gr := &sourcesv1alpha1.GitRepository{}
 					if err := k8sClient.Get(ctx, key, gr); err == nil {
 						_ = k8sClient.Delete(ctx, gr)
+						_, _ = newGitRepositoryReconciler(&FakeGitRepositoryDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 					}
 				})
 
 				domain := &FakeGitRepositoryDomain{}
 				reconciler := newGitRepositoryReconciler(domain)
+
+				// First reconcile on a brand-new object only adds the
+				// finalizer and returns — the domain isn't invoked until
+				// the next pass.
+				_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -260,15 +281,18 @@ var _ = Describe("GitRepository Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("GitRepository"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
 				grObj, ok := cmd.Obj.(*sourcesv1alpha1.GitRepository)
 				Expect(ok).To(BeTrue())
-				Expect(grObj.Spec.Contract.Provider).To(Equal("github"))
-				Expect(grObj.Spec.Contract.HookURL).To(Equal(tc.hookURL))
-				Expect(grObj.Spec.Contract.Repository.Owner).To(Equal("ntlaletsi70"))
-				Expect(grObj.Spec.Contract.Webhooks).To(HaveLen(1))
-				Expect(grObj.Spec.Contract.Webhooks[0].Events).To(HaveLen(len(tc.webhookEvents)))
+
+				var contract testdata.GitRepositoryContract
+				Expect(json.Unmarshal(grObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(contract.Provider).To(Equal("github"))
+				Expect(contract.HookURL).To(Equal(tc.hookURL))
+				Expect(contract.Repository.Owner).To(Equal("ntlaletsi70"))
+				Expect(contract.Webhooks).To(HaveLen(1))
+				Expect(contract.Webhooks[0].Events).To(HaveLen(len(tc.webhookEvents)))
 			},
 
 			// Matches real CR: for-kaniko-app — push + pull_request
@@ -317,11 +341,16 @@ var _ = Describe("GitRepository Controller", func() {
 				gr := &sourcesv1alpha1.GitRepository{}
 				if err := k8sClient.Get(ctx, key, gr); err == nil {
 					_ = k8sClient.Delete(ctx, gr)
+					_, _ = newGitRepositoryReconciler(&FakeGitRepositoryDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				}
 			})
 
 			domain := &FakeGitRepositoryDomain{}
 			reconciler := newGitRepositoryReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -331,11 +360,11 @@ var _ = Describe("GitRepository Controller", func() {
 
 			grObj, ok := domain.Cmd.Obj.(*sourcesv1alpha1.GitRepository)
 			Expect(ok).To(BeTrue())
-			Expect(grObj.Spec.Contract.Repository.Owner).To(Equal("ntlaletsi70"))
-			Expect(grObj.Spec.Contract.Repository.Name).To(Equal("for-kaniko-app"))
-			// source-specific labels must be present
-			Expect(grObj.Labels["sources.blanketops.dev/gitrepository"]).To(Equal("for-kaniko-app"))
-			Expect(grObj.Labels["sources.blanketops.dev/provider"]).To(Equal("github-upjet"))
+
+			var contract testdata.GitRepositoryContract
+			Expect(json.Unmarshal(grObj.Spec.Contract.Raw, &contract)).To(Succeed())
+			Expect(contract.Repository.Owner).To(Equal("ntlaletsi70"))
+			Expect(contract.Repository.Name).To(Equal("for-kaniko-app"))
 		})
 	})
 

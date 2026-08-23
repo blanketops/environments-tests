@@ -17,22 +17,28 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	// test data — apimachinery types we built
 
+	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/environments"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 	"github.com/go-logr/logr"
-	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	testdata "github.com/blanketops-environments-tests/tests/data/environments"
+	testdata "github.com/blanketops/environments-tests/tests/data/environments"
 )
 
 // -----------------------------------------------------------------------------
@@ -44,7 +50,7 @@ import (
 
 type FakeBuildDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -54,7 +60,7 @@ func (f *FakeBuildDomain) CanUpdate(obj client.Object, old client.Object) bool {
 	return true
 }
 
-func (f *FakeBuildDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeBuildDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -70,45 +76,41 @@ var testLogger = logr.Discard()
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newTestReconciler(domain *FakeBuildDomain) *BuildReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newBuildTestReconciler(domain *FakeBuildDomain) *envctrl.BuildReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		environmentsv1alpha1.GroupVersion.WithKind("Build"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, testLogger)
+	eng := engine.NewEngine(reg, testLogger)
 
-	return &BuildReconciler{
+	return &envctrl.BuildReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32),
+		Recorder: events.NewFakeRecorder(32),
 	}
 }
 
 // buildFromData converts a testdata.BuildData into the API type the controller
 // expects. This is the bridge between the test data package and the API types.
+//
+// Build.Spec is an opaque contract (Spec.Contract runtime.RawExtension) —
+// the resolver parses it as raw JSON, not typed Go struct fields. testdata's
+// BuildSpec already carries the correct json tags for that raw contract
+// shape, so this just marshals it directly rather than re-mapping fields
+// onto a typed struct that no longer exists on the real API type.
 func buildFromData(d *testdata.BuildData) *environmentsv1alpha1.Build {
+	raw, err := json.Marshal(d.Spec)
+	if err != nil {
+		panic(fmt.Sprintf("marshal build contract: %v", err))
+	}
 	return &environmentsv1alpha1.Build{
 		ObjectMeta: d.ObjectMeta,
 		Spec: environmentsv1alpha1.BuildSpec{
-			Image: d.Spec.Image,
-			Strategy: environmentsv1alpha1.Strategy{
-				Kind: string(d.Spec.Strategy.Kind),
-				Name: d.Spec.Strategy.Name,
-			},
-			Source: environmentsv1alpha1.GitSource{
-				URL:         d.Spec.Source.URL,
-				Revision:    d.Spec.Source.Revision,
-				Context:     d.Spec.Source.ContextDir,
-				CloneSecret: d.Spec.Source.CloneSecret,
-			},
-			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name:   d.Spec.ServiceAccount.Name,
-				Secret: d.Spec.ServiceAccount.Secret,
-			},
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
 }
@@ -164,12 +166,21 @@ var _ = Describe("Build Controller", func() {
 			build := &environmentsv1alpha1.Build{}
 			if err := k8sClient.Get(ctx, key, build); err == nil {
 				_ = k8sClient.Delete(ctx, build)
+				// The real reconciler's finalizer gate runs regardless of which
+				// domain is injected — nothing else is watching this cluster
+				// during these tests, so drive the delete path once more here
+				// or the object is stuck in Terminating forever.
+				_, _ = newBuildTestReconciler(&FakeBuildDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			}
 		})
 
 		It("routes the Build update through the engine to the Build domain", func() {
 			domain := &FakeBuildDomain{}
-			reconciler := newTestReconciler(domain)
+			reconciler := newBuildTestReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -178,13 +189,13 @@ var _ = Describe("Build Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 			Expect(domain.Cmd.GVK.Kind).To(Equal("Build"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
 		It("is idempotent when reconciling the same Build multiple times", func() {
 			domain := &FakeBuildDomain{}
-			reconciler := newTestReconciler(domain)
+			reconciler := newBuildTestReconciler(domain)
 
 			for i := 0; i < 2; i++ {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -194,14 +205,18 @@ var _ = Describe("Build Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the Build domain fails", func() {
 			domain := &FakeBuildDomain{
 				Err: fmt.Errorf("build domain failure"),
 			}
-			reconciler := newTestReconciler(domain)
+			reconciler := newBuildTestReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -234,10 +249,16 @@ var _ = Describe("Build Controller", func() {
 				Expect(k8sClient.Create(ctx, build)).To(Succeed())
 				DeferCleanup(func() {
 					_ = k8sClient.Delete(ctx, build)
+					_, _ = newBuildTestReconciler(&FakeBuildDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				})
 
 				domain := &FakeBuildDomain{}
-				reconciler := newTestReconciler(domain)
+				reconciler := newBuildTestReconciler(domain)
+
+				// First reconcile on a brand-new object only adds the
+				// finalizer and returns — the domain isn't invoked until
+				// the next pass.
+				_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -248,13 +269,16 @@ var _ = Describe("Build Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("Build"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
 				buildObj, ok := cmd.Obj.(*environmentsv1alpha1.Build)
 				Expect(ok).To(BeTrue())
-				Expect(buildObj.Spec.Strategy.Name).To(Equal(tc.strategy))
-				Expect(buildObj.Spec.ServiceAccount.Name).To(Equal("build-bot"))
-				Expect(buildObj.Spec.ServiceAccount.Secret).To(Equal("docker-registry-credentials"))
+
+				var contract testdata.BuildSpec
+				Expect(json.Unmarshal(buildObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(contract.Strategy.Name).To(Equal(tc.strategy))
+				Expect(contract.ServiceAccount.Name).To(Equal("build-bot"))
+				Expect(contract.ServiceAccount.Secret).To(Equal("docker-registry-credentials"))
 			},
 
 			Entry("kaniko", buildTestCase{
@@ -279,7 +303,7 @@ var _ = Describe("Build Controller", func() {
 	Context("Build not found", func() {
 		It("returns no error when the Build CR no longer exists", func() {
 			domain := &FakeBuildDomain{}
-			reconciler := newTestReconciler(domain)
+			reconciler := newBuildTestReconciler(domain)
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{

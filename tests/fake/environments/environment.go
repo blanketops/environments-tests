@@ -17,23 +17,27 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/go-logr/logr"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/environments"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 )
 
 // -----------------------------------------------------------------------------
@@ -44,7 +48,7 @@ import (
 // The controller, registry, engine, and command flow are real.
 type FakeEnvironmentDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -54,7 +58,7 @@ func (f *FakeEnvironmentDomain) CanUpdate(obj client.Object, old client.Object) 
 	return true
 }
 
-func (f *FakeEnvironmentDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeEnvironmentDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -64,54 +68,66 @@ func (f *FakeEnvironmentDomain) GVK() schema.GroupVersionKind {
 	return environmentsv1alpha1.GroupVersion.WithKind("Environment")
 }
 
-var testLogger = logr.Discard()
+// Note: testLogger is declared in build.go — same package, no redeclaration.
 
 //
 // -----------------------------------------------------------------------------
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newTestReconciler(domain *FakeEnvironmentDomain) *EnvironmentReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newEnvironmentTestReconciler(domain *FakeEnvironmentDomain) *envctrl.EnvironmentReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		environmentsv1alpha1.GroupVersion.WithKind("Environment"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, testLogger)
+	eng := engine.NewEngine(reg, testLogger)
 
-	return &EnvironmentReconciler{
+	return &envctrl.EnvironmentReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32), // ✅ REQUIRED
+		Recorder: events.NewFakeRecorder(32), // ✅ REQUIRED
 	}
 }
 
-func validEnvironment(name string, strategy string) *environmentsv1alpha1.Environment {
+// environmentContract mirrors the raw JSON shape resolution/environment/resolve
+// actually parses: applicationName, branch, gitOwner, environmentType, and
+// version are required; CR references (build, deployment, route, etc.) and
+// serviceUnits are optional and omitted here — this fixture only needs to
+// resolve, not compose a full environment.
+type environmentContract struct {
+	ApplicationName string `json:"applicationName"`
+	Branch          string `json:"branch"`
+	GitOwner        string `json:"gitOwner"`
+	EnvironmentType string `json:"environmentType"`
+	Version         string `json:"version"`
+}
+
+// validEnvironment builds an Environment CR with a minimal, resolver-valid
+// contract. Environment.Spec is an opaque contract (Spec.Contract
+// runtime.RawExtension) — the resolver parses it as raw JSON, not typed Go
+// struct fields directly on EnvironmentSpec.
+func validEnvironment(name string, environmentType string) *environmentsv1alpha1.Environment {
+	raw, err := json.Marshal(environmentContract{
+		ApplicationName: name,
+		Branch:          "main",
+		GitOwner:        "example-org",
+		EnvironmentType: environmentType,
+		Version:         "v1",
+	})
+	if err != nil {
+		panic(fmt.Sprintf("marshal environment contract: %v", err))
+	}
 	return &environmentsv1alpha1.Environment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
 		},
 		Spec: environmentsv1alpha1.EnvironmentSpec{
-			Image: "docker.io/example/app:latest",
-
-			Strategy: environmentsv1alpha1.Strategy{
-				Kind: "ClusterEnvironmentStrategy",
-				Name: strategy,
-			},
-
-			Source: environmentsv1alpha1.GitSource{
-				URL:      "https://github.com/example/repo.git",
-				Revision: "main",
-				Context: "."
-			},
-			ServiceAccount: environmentsv1alpha1.ServiceAccount{
-				Name: "Environment-bot",
-				Secret: "docker-registry"
-			},
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
 }
@@ -129,18 +145,18 @@ var _ = Describe("Environment Controller", func() {
 	// -------------------------------------------------------------------------
 
 	Context("Basic reconciliation behaviour", func() {
-		const name = "test-Environment-basic"
+		const name = "test-environment-basic"
 
 		key := types.NamespacedName{
 			Name:      name,
-			Namespace: "test",
+			Namespace: "default",
 		}
 
 		BeforeEach(func() {
 			Environment := &environmentsv1alpha1.Environment{}
 			if err := k8sClient.Get(ctx, key, Environment); errors.IsNotFound(err) {
 				Expect(
-					k8sClient.Create(ctx, validEnvironment(name, "kaniko")),
+					k8sClient.Create(ctx, validEnvironment(name, "development")),
 				).To(Succeed())
 			}
 		})
@@ -154,7 +170,7 @@ var _ = Describe("Environment Controller", func() {
 
 		It("routes the Environment update through the engine to the Environment domain", func() {
 			domain := &FakeEnvironmentDomain{}
-			reconciler := newTestReconciler(domain)
+			reconciler := newEnvironmentTestReconciler(domain)
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -164,13 +180,13 @@ var _ = Describe("Environment Controller", func() {
 			Expect(domain.Called).To(BeTrue())
 
 			Expect(domain.Cmd.GVK.Kind).To(Equal("Environment"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
 		It("is idempotent when reconciling the same Environment multiple times", func() {
 			domain := &FakeEnvironmentDomain{}
-			reconciler := newTestReconciler(domain)
+			reconciler := newEnvironmentTestReconciler(domain)
 
 			for i := 0; i < 2; i++ {
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
@@ -180,14 +196,14 @@ var _ = Describe("Environment Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the Environment domain fails", func() {
 			domain := &FakeEnvironmentDomain{
 				Err: fmt.Errorf("Environment domain failure"),
 			}
-			reconciler := newTestReconciler(domain)
+			reconciler := newEnvironmentTestReconciler(domain)
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -202,34 +218,28 @@ var _ = Describe("Environment Controller", func() {
 	// STRATEGY ROUTING
 	// -------------------------------------------------------------------------
 
-	Context("Environment strategy routing", func() {
+	Context("Environment type routing", func() {
 		type testCase struct {
-			name     string
-			strategy string
-			serviceAccount serviceAccount
-		}
-
-		type serviceAccount struct {
-			name string
-			secret string
+			name            string
+			environmentType string
 		}
 
 		DescribeTable(
-			"routes Environment with correct strategy",
+			"routes Environment with the correct environmentType",
 			func(tc testCase) {
 				key := types.NamespacedName{
 					Name:      tc.name,
 					Namespace: "default",
 				}
 
-				Environment := validEnvironment(tc.name, tc.strategy)
-				Expect(k8sClient.Create(ctx, Environment)).To(Succeed())
+				environment := validEnvironment(tc.name, tc.environmentType)
+				Expect(k8sClient.Create(ctx, environment)).To(Succeed())
 				DeferCleanup(func() {
-					_ = k8sClient.Delete(ctx, Environment)
+					_ = k8sClient.Delete(ctx, environment)
 				})
 
 				domain := &FakeEnvironmentDomain{}
-				reconciler := newTestReconciler(domain)
+				reconciler := newEnvironmentTestReconciler(domain)
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -240,26 +250,27 @@ var _ = Describe("Environment Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("Environment"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
-				EnvironmentObj, ok := cmd.Obj.(*environmentsv1alpha1.Environment)
+				environmentObj, ok := cmd.Obj.(*environmentsv1alpha1.Environment)
 				Expect(ok).To(BeTrue())
 
-				Expect(EnvironmentObj.Spec.Strategy.Name).To(Equal(tc.strategy))
-				//Expect(EnvironmentObj.Spec.ServiceAccount.Name).To(Equal(tc.
+				var contract environmentContract
+				Expect(json.Unmarshal(environmentObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(contract.EnvironmentType).To(Equal(tc.environmentType))
 			},
 
-			Entry("kaniko", testCase{
-				name:     "Environment-kaniko",
-				strategy: "kaniko",
+			Entry("development", testCase{
+				name:            "environment-development",
+				environmentType: "development",
 			}),
-			Entry("Environmentah", testCase{
-				name:     "Environment-Environmentah",
-				strategy: "Environmentah-shipwright-managed-push",
+			Entry("staging", testCase{
+				name:            "environment-staging",
+				environmentType: "staging",
 			}),
-			Entry("Environmentpacks", testCase{
-				name:     "Environment-Environmentpacks",
-				strategy: "Environmentpacks-v3",
+			Entry("production", testCase{
+				name:            "environment-production",
+				environmentType: "production",
 			}),
 		)
 	})

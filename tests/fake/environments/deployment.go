@@ -17,23 +17,29 @@ package environments
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	environmentsv1alpha1 "github.com/BlanketOps/environments-api/api/environments/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/environments"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 
 	// test data — apimachinery types we built
-	testdata "github.com/blanketops-environments-tests/tests/data/environments"
+	testdata "github.com/blanketops/environments-tests/tests/data/environments"
 )
 
 // -----------------------------------------------------------------------------
@@ -45,7 +51,7 @@ import (
 
 type FakeDeploymentDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -55,7 +61,7 @@ func (f *FakeDeploymentDomain) CanUpdate(obj client.Object, old client.Object) b
 	return true
 }
 
-func (f *FakeDeploymentDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeDeploymentDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -71,44 +77,40 @@ func (f *FakeDeploymentDomain) GVK() schema.GroupVersionKind {
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newDeploymentReconciler(domain *FakeDeploymentDomain) *DeploymentReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newDeploymentReconciler(domain *FakeDeploymentDomain) *envctrl.DeploymentReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		environmentsv1alpha1.GroupVersion.WithKind("Deployment"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, testLogger)
+	eng := engine.NewEngine(reg, testLogger)
 
-	return &DeploymentReconciler{
+	return &envctrl.DeploymentReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      testLogger,
-		Recorder: record.NewFakeRecorder(32),
+		Recorder: events.NewFakeRecorder(32),
 	}
 }
 
 // deploymentFromData converts a testdata.DeploymentData into the API type
 // the controller expects. Single conversion point — nothing scattered across tests.
+//
+// Deployment.Spec is an opaque contract (Spec.Contract runtime.RawExtension)
+// — the resolver parses it as raw JSON, not typed Go struct fields.
+// testdata's DeploymentContract already carries the correct json tags for
+// that raw contract shape, so this just marshals it directly.
 func deploymentFromData(d *testdata.DeploymentData) *environmentsv1alpha1.Deployment {
+	raw, err := json.Marshal(d.Spec.Contract)
+	if err != nil {
+		panic(fmt.Sprintf("marshal deployment contract: %v", err))
+	}
 	return &environmentsv1alpha1.Deployment{
 		ObjectMeta: d.ObjectMeta,
 		Spec: environmentsv1alpha1.DeploymentSpec{
-			Contract: environmentsv1alpha1.DeploymentContract{
-				ServiceUnits:           d.Spec.Contract.ServiceUnits,
-				Runtime:                environmentsv1alpha1.DeploymentRuntimeValue(d.Spec.Contract.Runtime),
-				Strategy:               environmentsv1alpha1.DeploymentStrategyValue(d.Spec.Contract.Strategy),
-				ImageAutomation:        d.Spec.Contract.ImageAutomation,
-				ReconciliationStrategy: environmentsv1alpha1.ReconciliationStrategyValue(d.Spec.Contract.ReconciliationStrategy),
-				GitOwner:               d.Spec.Contract.GitOwner,
-				ManifestsRepo: environmentsv1alpha1.ManifestsRepo{
-					URL:         d.Spec.Contract.ManifestsRepo.URL,
-					CloneSecret: d.Spec.Contract.ManifestsRepo.CloneSecret,
-					Strategy:    d.Spec.Contract.ManifestsRepo.Strategy,
-					Path:        d.Spec.Contract.ManifestsRepo.Path,
-				},
-			},
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
 }
@@ -149,12 +151,21 @@ var _ = Describe("Deployment Controller", func() {
 			deployment := &environmentsv1alpha1.Deployment{}
 			if err := k8sClient.Get(ctx, key, deployment); err == nil {
 				_ = k8sClient.Delete(ctx, deployment)
+				// The real reconciler's finalizer gate runs regardless of which
+				// domain is injected — nothing else is watching this cluster
+				// during these tests, so drive the delete path once more here
+				// or the object is stuck in Terminating forever.
+				_, _ = newDeploymentReconciler(&FakeDeploymentDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			}
 		})
 
 		It("routes the Deployment update through the engine to the Deployment domain", func() {
 			domain := &FakeDeploymentDomain{}
 			reconciler := newDeploymentReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -163,7 +174,7 @@ var _ = Describe("Deployment Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 			Expect(domain.Cmd.GVK.Kind).To(Equal("Deployment"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
@@ -179,7 +190,7 @@ var _ = Describe("Deployment Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the Deployment domain fails", func() {
@@ -187,6 +198,10 @@ var _ = Describe("Deployment Controller", func() {
 				Err: fmt.Errorf("deployment domain failure"),
 			}
 			reconciler := newDeploymentReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -227,11 +242,17 @@ var _ = Describe("Deployment Controller", func() {
 					deployment := &environmentsv1alpha1.Deployment{}
 					if err := k8sClient.Get(ctx, key, deployment); err == nil {
 						_ = k8sClient.Delete(ctx, deployment)
+						_, _ = newDeploymentReconciler(&FakeDeploymentDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 					}
 				})
 
 				domain := &FakeDeploymentDomain{}
 				reconciler := newDeploymentReconciler(domain)
+
+				// First reconcile on a brand-new object only adds the
+				// finalizer and returns — the domain isn't invoked until
+				// the next pass.
+				_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -242,14 +263,17 @@ var _ = Describe("Deployment Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("Deployment"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
 				deploymentObj, ok := cmd.Obj.(*environmentsv1alpha1.Deployment)
 				Expect(ok).To(BeTrue())
-				Expect(string(deploymentObj.Spec.Contract.Strategy)).To(Equal(string(tc.strategy)))
-				Expect(deploymentObj.Spec.Contract.ImageAutomation).To(Equal(tc.imageAutomation))
-				Expect(deploymentObj.Spec.Contract.GitOwner).To(Equal("ntlaletsi70"))
-				Expect(deploymentObj.Spec.Contract.ManifestsRepo.Path).To(Equal("./overlays/dev"))
+
+				var contract testdata.DeploymentContract
+				Expect(json.Unmarshal(deploymentObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(string(contract.Strategy)).To(Equal(string(tc.strategy)))
+				Expect(contract.ImageAutomation).To(Equal(tc.imageAutomation))
+				Expect(contract.GitOwner).To(Equal("ntlaletsi70"))
+				Expect(contract.ManifestsRepo.Path).To(Equal("./overlays/dev"))
 			},
 
 			Entry("rolling — standard single unit", deploymentTestCase{
@@ -301,11 +325,17 @@ var _ = Describe("Deployment Controller", func() {
 					deployment := &environmentsv1alpha1.Deployment{}
 					if err := k8sClient.Get(ctx, key, deployment); err == nil {
 						_ = k8sClient.Delete(ctx, deployment)
+						_, _ = newDeploymentReconciler(&FakeDeploymentDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 					}
 				})
 
 				domain := &FakeDeploymentDomain{}
 				reconciler := newDeploymentReconciler(domain)
+
+				// First reconcile on a brand-new object only adds the
+				// finalizer and returns — the domain isn't invoked until
+				// the next pass.
+				_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -316,7 +346,10 @@ var _ = Describe("Deployment Controller", func() {
 
 				deploymentObj, ok := domain.Cmd.Obj.(*environmentsv1alpha1.Deployment)
 				Expect(ok).To(BeTrue())
-				Expect(string(deploymentObj.Spec.Contract.Runtime)).To(Equal(string(tc.runtime)))
+
+				var contract testdata.DeploymentContract
+				Expect(json.Unmarshal(deploymentObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(string(contract.Runtime)).To(Equal(string(tc.runtime)))
 			},
 
 			Entry("kubernetes container runtime", runtimeTestCase{
@@ -345,11 +378,16 @@ var _ = Describe("Deployment Controller", func() {
 				deployment := &environmentsv1alpha1.Deployment{}
 				if err := k8sClient.Get(ctx, key, deployment); err == nil {
 					_ = k8sClient.Delete(ctx, deployment)
+					_, _ = newDeploymentReconciler(&FakeDeploymentDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				}
 			})
 
 			domain := &FakeDeploymentDomain{}
 			reconciler := newDeploymentReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -360,12 +398,15 @@ var _ = Describe("Deployment Controller", func() {
 
 			deploymentObj, ok := domain.Cmd.Obj.(*environmentsv1alpha1.Deployment)
 			Expect(ok).To(BeTrue())
-			Expect(deploymentObj.Spec.Contract.ServiceUnits).To(HaveLen(2))
-			Expect(deploymentObj.Spec.Contract.ServiceUnits).To(ContainElements(
+
+			var contract testdata.DeploymentContract
+			Expect(json.Unmarshal(deploymentObj.Spec.Contract.Raw, &contract)).To(Succeed())
+			Expect(contract.ServiceUnits).To(HaveLen(2))
+			Expect(contract.ServiceUnits).To(ContainElements(
 				name+"-api",
 				name+"-worker",
 			))
-			Expect(deploymentObj.Spec.Contract.ImageAutomation).To(BeTrue())
+			Expect(contract.ImageAutomation).To(BeTrue())
 		})
 	})
 

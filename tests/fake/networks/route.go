@@ -17,23 +17,29 @@ package networks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	networksv1alpha1 "github.com/BlanketOps/environments-api/api/networks/v1alpha1"
-	"github.com/ntlaletsi70/blanketops-environments/core"
+	networksv1alpha1 "github.com/blanketops/environments-api/api/networks/v1alpha1"
+	envctrl "github.com/blanketops/environments-controller/pkg/controller/networks"
+	envruntime "github.com/blanketops/environments-controller/pkg/runtime"
+	"github.com/blanketops/environments/core/command"
+	"github.com/blanketops/environments/core/engine"
+	"github.com/blanketops/environments/core/registry"
 
 	// test data — apimachinery types we built
-	testdata "github.com/blanketops-environments-tests/tests/data/networks"
+	testdata "github.com/blanketops/environments-tests/tests/data/networks"
 )
 
 // -----------------------------------------------------------------------------
@@ -50,7 +56,7 @@ import (
 
 type FakeRouteDomain struct {
 	Called bool
-	Cmd    core.Command
+	Cmd    command.Command
 	Err    error
 }
 
@@ -60,7 +66,7 @@ func (f *FakeRouteDomain) CanUpdate(obj client.Object, old client.Object) bool {
 	return true
 }
 
-func (f *FakeRouteDomain) Handle(ctx context.Context, cmd core.Command) error {
+func (f *FakeRouteDomain) Handle(ctx context.Context, cmd command.Command) error {
 	f.Called = true
 	f.Cmd = cmd
 	return f.Err
@@ -76,35 +82,40 @@ func (f *FakeRouteDomain) GVK() schema.GroupVersionKind {
 // Test helpers
 // -----------------------------------------------------------------------------
 
-func newRouteReconciler(domain *FakeRouteDomain) *RouteReconciler {
-	registry := core.NewRegistry()
-	registry.RegisterDomain(
+func newRouteReconciler(domain *FakeRouteDomain) *envctrl.RouteReconciler {
+	reg := registry.NewRegistry()
+	reg.RegisterDomain(
 		networksv1alpha1.GroupVersion.WithKind("Route"),
 		domain,
 	)
 
-	engine := core.NewEngine(registry, domainTestLogger)
+	eng := engine.NewEngine(reg, domainTestLogger)
 
-	return &RouteReconciler{
+	return &envctrl.RouteReconciler{
 		Client:   k8sClient,
 		Scheme:   k8sClient.Scheme(),
-		Engine:   engine,
+		Runtime:  &envruntime.Runtime{Registry: reg, Engine: eng},
 		Log:      domainTestLogger,
-		Recorder: record.NewFakeRecorder(32),
+		Recorder: events.NewFakeRecorder(32),
 	}
 }
 
 // routeFromData converts a testdata.RouteData into the API type
 // the controller expects. Single conversion point — nothing scattered across tests.
+//
+// Route.Spec is an opaque contract (Spec.Contract runtime.RawExtension) —
+// the resolver parses it as raw JSON, not typed Go struct fields.
+// testdata's RouteSpec already carries the correct json tags for that raw
+// contract shape, so this just marshals it directly.
 func routeFromData(d *testdata.RouteData) *networksv1alpha1.Route {
+	raw, err := json.Marshal(d.Spec)
+	if err != nil {
+		panic(fmt.Sprintf("marshal route contract: %v", err))
+	}
 	return &networksv1alpha1.Route{
 		ObjectMeta: d.ObjectMeta,
 		Spec: networksv1alpha1.RouteSpec{
-			Host:       d.Spec.Host,
-			Path:       d.Spec.Path,
-			Enabled:    d.Spec.Enabled,
-			TLSEnabled: d.Spec.TLSEnabled,
-			Runtime:    networksv1alpha1.RouteRuntime(d.Spec.Runtime),
+			Contract: runtime.RawExtension{Raw: raw},
 		},
 	}
 }
@@ -146,12 +157,21 @@ var _ = Describe("Route Controller", func() {
 			r := &networksv1alpha1.Route{}
 			if err := k8sClient.Get(ctx, key, r); err == nil {
 				_ = k8sClient.Delete(ctx, r)
+				// The real reconciler's finalizer gate runs regardless of which
+				// domain is injected — nothing else is watching this cluster
+				// during these tests, so drive the delete path once more here
+				// or the object is stuck in Terminating forever.
+				_, _ = newRouteReconciler(&FakeRouteDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			}
 		})
 
 		It("routes the Route update through the engine to the Route domain", func() {
 			domain := &FakeRouteDomain{}
 			reconciler := newRouteReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -160,7 +180,7 @@ var _ = Describe("Route Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(domain.Called).To(BeTrue())
 			Expect(domain.Cmd.GVK.Kind).To(Equal("Route"))
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 			Expect(domain.Cmd.Obj).NotTo(BeNil())
 		})
 
@@ -176,7 +196,7 @@ var _ = Describe("Route Controller", func() {
 			}
 
 			Expect(domain.Called).To(BeTrue())
-			Expect(domain.Cmd.Type).To(Equal(core.CmdUpdate))
+			Expect(domain.Cmd.Type).To(Equal(command.CmdUpdate))
 		})
 
 		It("returns an error when the Route domain fails", func() {
@@ -184,6 +204,10 @@ var _ = Describe("Route Controller", func() {
 				Err: fmt.Errorf("route domain failure"),
 			}
 			reconciler := newRouteReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -237,11 +261,17 @@ var _ = Describe("Route Controller", func() {
 					r := &networksv1alpha1.Route{}
 					if err := k8sClient.Get(ctx, key, r); err == nil {
 						_ = k8sClient.Delete(ctx, r)
+						_, _ = newRouteReconciler(&FakeRouteDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 					}
 				})
 
 				domain := &FakeRouteDomain{}
 				reconciler := newRouteReconciler(domain)
+
+				// First reconcile on a brand-new object only adds the
+				// finalizer and returns — the domain isn't invoked until
+				// the next pass.
+				_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -252,15 +282,18 @@ var _ = Describe("Route Controller", func() {
 
 				cmd := domain.Cmd
 				Expect(cmd.GVK.Kind).To(Equal("Route"))
-				Expect(cmd.Type).To(Equal(core.CmdUpdate))
+				Expect(cmd.Type).To(Equal(command.CmdUpdate))
 
 				routeObj, ok := cmd.Obj.(*networksv1alpha1.Route)
 				Expect(ok).To(BeTrue())
-				Expect(routeObj.Spec.Host).To(Equal(tc.host))
-				Expect(routeObj.Spec.Path).To(Equal(tc.path))
-				Expect(routeObj.Spec.TLSEnabled).To(Equal(tc.tlsEnabled))
-				Expect(routeObj.Spec.Enabled).To(Equal(tc.enabled))
-				Expect(string(routeObj.Spec.Runtime)).To(Equal(string(tc.runtime)))
+
+				var contract testdata.RouteSpec
+				Expect(json.Unmarshal(routeObj.Spec.Contract.Raw, &contract)).To(Succeed())
+				Expect(contract.Host).To(Equal(tc.host))
+				Expect(contract.Path).To(Equal(tc.path))
+				Expect(contract.TLSEnabled).To(Equal(tc.tlsEnabled))
+				Expect(contract.Enabled).To(Equal(tc.enabled))
+				Expect(string(contract.Runtime)).To(Equal(string(tc.runtime)))
 			},
 
 			// Matches real CR: shopping-app-route
@@ -323,11 +356,16 @@ var _ = Describe("Route Controller", func() {
 				r := &networksv1alpha1.Route{}
 				if err := k8sClient.Get(ctx, key, r); err == nil {
 					_ = k8sClient.Delete(ctx, r)
+					_, _ = newRouteReconciler(&FakeRouteDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				}
 			})
 
 			domain := &FakeRouteDomain{}
 			reconciler := newRouteReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -337,8 +375,11 @@ var _ = Describe("Route Controller", func() {
 
 			routeObj, ok := domain.Cmd.Obj.(*networksv1alpha1.Route)
 			Expect(ok).To(BeTrue())
-			Expect(routeObj.Spec.Path).To(Equal("/api/v1"))
-			Expect(routeObj.Spec.Host).To(Equal("api.dev.domain.co.za"))
+
+			var contract testdata.RouteSpec
+			Expect(json.Unmarshal(routeObj.Spec.Contract.Raw, &contract)).To(Succeed())
+			Expect(contract.Path).To(Equal("/api/v1"))
+			Expect(contract.Host).To(Equal("api.dev.domain.co.za"))
 		})
 	})
 
