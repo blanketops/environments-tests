@@ -31,17 +31,28 @@ jobs:
       with:
         go-version-file: go.mod
 
-    - name: Configure Git for private modules
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        git config --global url."https://${GH_PAT}@github.com/".insteadOf "https://github.com/"
-        go env -w GOPRIVATE=github.com/ntlaletsi70/*
-        go env -w GONOSUMDB=github.com/ntlaletsi70/*
-        go env -w GOPROXY=direct
-
     - name: Tidy dependencies
       run: go mod tidy
+
+    - name: Install kind
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-$(go env GOARCH)
+        chmod +x ./kind
+        sudo mv ./kind /usr/local/bin/kind
+
+    - name: Create kind cluster
+      run: kind create cluster --wait 120s
+
+    - name: Checkout environments-install
+      uses: actions/checkout@v4
+      with:
+        repository: blanketops/environments-install
+        path: environments-install
+
+    - name: Install CRDs
+      run: |
+        cd environments-install
+        make install
 
     - name: Resolve test path
       id: resolve
