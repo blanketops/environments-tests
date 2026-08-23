@@ -26,15 +26,17 @@ import (
 // Used to construct test fixtures without importing the full API type.
 //
 // Architectural role:
-//   Route is intentionally the thinnest CR in the BlanketOps stack.
-//   It declares the host, path, TLS intent, and runtime binding for a workload.
-//   The controller reconciles a Domain CR as an owned child — the Domain owns
-//   the full cert/mapping chain (DomainClaim, DomainMapping, Issuer, Certificate).
-//   Deleting a Route cascades to its owned Domain CR.
+//
+//	Route is intentionally the thinnest CR in the BlanketOps stack.
+//	It declares the host, path, TLS intent, and runtime binding for a workload.
+//	The controller reconciles a Domain CR as an owned child — the Domain owns
+//	the full cert/mapping chain (DomainClaim, DomainMapping, Issuer, Certificate).
+//	Deleting a Route cascades to its owned Domain CR.
 //
 // TLS split:
-//   *.dev.domain.co.za  → platform (DNS01 wildcard ClusterIssuer)
-//   client-a.co.za      → custom  (HTTP01 namespaced Issuer per tenant)
+//
+//	*.dev.domain.co.za  → platform (DNS01 wildcard ClusterIssuer)
+//	client-a.co.za      → custom  (HTTP01 namespaced Issuer per tenant)
 //
 // APIVersion: networking.environments.blanketops.dev/v1alpha1
 type RouteData struct {
@@ -142,16 +144,16 @@ func NewRouteData(name, namespace, host, envName string) *RouteData {
 			Name:      name,
 			Namespace: namespace,
 			Labels: map[string]string{
-			    "app.kubernetes.io/name":                       "blanketops-environments",
-		        "app.kubernetes.io/part-of":                    "blanketops",
-		        "app.kubernetes.io/managed-by":                 "kustomize",
-		        "app.kubernetes.io/version":                    "v0.0.1",
-	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             "dev",
-		        "environments.blanketops.dev/api-version":      "v0.1.4",
-		        "environments.blanketops.dev/contract-version": "v0.1.7",
-		        "environments.blanketops.dev/controller-version": "v0.2.3",
-		        "environments.blanketops.dev/operator-version": "v0.2.1",
+				"app.kubernetes.io/name":                         "blanketops-environments",
+				"app.kubernetes.io/part-of":                      "blanketops",
+				"app.kubernetes.io/managed-by":                   "kustomize",
+				"app.kubernetes.io/version":                      "v0.0.1",
+				"environments.blanketops.dev/name":               envName,
+				"environments.blanketops.dev/type":               "dev",
+				"environments.blanketops.dev/api-version":        "v0.1.4",
+				"environments.blanketops.dev/contract-version":   "v0.1.7",
+				"environments.blanketops.dev/controller-version": "v0.2.3",
+				"environments.blanketops.dev/operator-version":   "v0.2.1",
 			},
 		},
 		Spec: RouteSpec{

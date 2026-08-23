@@ -26,10 +26,11 @@ import (
 // Used to construct test fixtures without importing the full API type.
 //
 // Architectural role:
-//   GitHubEvent declares which GitHub webhook events should wake up the pipeline.
-//   The controller reconciles child Argo Events resources (EventSource, EventBus,
-//   Sensor) as owned resources — cascade deleted when the GitHubEvent is deleted.
-//   On a matching event the Sensor fires and the controller creates a BuildTrigger CR.
+//
+//	GitHubEvent declares which GitHub webhook events should wake up the pipeline.
+//	The controller reconciles child Argo Events resources (EventSource, EventBus,
+//	Sensor) as owned resources — cascade deleted when the GitHubEvent is deleted.
+//	On a matching event the Sensor fires and the controller creates a BuildTrigger CR.
 //
 // APIVersion: events.blanketops.dev/v1alpha1
 // Namespace:  argo-events (Argo Events controller watches this namespace)
@@ -151,16 +152,16 @@ func NewGitHubEventData(name, envName string) *GitHubEventData {
 			Name:      name,
 			Namespace: "argo-events",
 			Labels: map[string]string{
-				"app.kubernetes.io/name":                       "blanketops-environments",
-		        "app.kubernetes.io/part-of":                    "blanketops",
-		        "app.kubernetes.io/managed-by":                 "kustomize",
-		        "app.kubernetes.io/version":                    "v0.0.1",
-	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             "dev",
-		        "environments.blanketops.dev/api-version":      "v0.1.4",
-		        "environments.blanketops.dev/contract-version": "v0.1.7",
-		        "environments.blanketops.dev/controller-version": "v0.2.3",
-		        "environments.blanketops.dev/operator-version": "v0.2.1",
+				"app.kubernetes.io/name":                         "blanketops-environments",
+				"app.kubernetes.io/part-of":                      "blanketops",
+				"app.kubernetes.io/managed-by":                   "kustomize",
+				"app.kubernetes.io/version":                      "v0.0.1",
+				"environments.blanketops.dev/name":               envName,
+				"environments.blanketops.dev/type":               "dev",
+				"environments.blanketops.dev/api-version":        "v0.1.4",
+				"environments.blanketops.dev/contract-version":   "v0.1.7",
+				"environments.blanketops.dev/controller-version": "v0.2.3",
+				"environments.blanketops.dev/operator-version":   "v0.2.1",
 			},
 		},
 		Spec: GitHubEventSpec{

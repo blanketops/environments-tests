@@ -26,21 +26,24 @@ import (
 // Used to construct test fixtures without importing the full API type.
 //
 // Architectural role:
-//   Domain owns the cert/mapping chain for a host.
-//   Route owns the workload binding (runtime, path, enabled).
-//   They are peers in the same namespace — Domain is reconciled as
-//   an owned child of Route (cascade delete).
+//
+//	Domain owns the cert/mapping chain for a host.
+//	Route owns the workload binding (runtime, path, enabled).
+//	They are peers in the same namespace — Domain is reconciled as
+//	an owned child of Route (cascade delete).
 //
 // TLS strategy:
-//   platform: *.dev.domain.co.za wildcard cert — DNS01 ClusterIssuer already issued.
-//             Controller emits DomainClaim + DomainMapping only. No cert work needed.
-//   custom:   client-owned zone (e.g. client-a.co.za).
-//             Controller emits Issuer + DomainClaim + DomainMapping + Certificate.
-//             HTTP01 challenge via nginx solver in the tenant namespace.
+//
+//	platform: *.dev.domain.co.za wildcard cert — DNS01 ClusterIssuer already issued.
+//	          Controller emits DomainClaim + DomainMapping only. No cert work needed.
+//	custom:   client-owned zone (e.g. client-a.co.za).
+//	          Controller emits Issuer + DomainClaim + DomainMapping + Certificate.
+//	          HTTP01 challenge via nginx solver in the tenant namespace.
 //
 // mTLS:
-//   Inter-service mTLS via blanketops-proxy + blanketK.
-//   Declared here — platform wires the sidecar identity automatically.
+//
+//	Inter-service mTLS via blanketops-proxy + blanketK.
+//	Declared here — platform wires the sidecar identity automatically.
 //
 // APIVersion: networks.blanketops.dev/v1alpha1
 type DomainData struct {
@@ -165,16 +168,16 @@ const (
 // as seen on the real Domain CR — all ten labels.
 func blanketopsLabels(envName, envType string) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":                       "blanketops-environments",
-		"app.kubernetes.io/part-of":                    "blanketops",
-		"app.kubernetes.io/managed-by":                 "kustomize",
-		"app.kubernetes.io/version":                    "v0.0.1",
-		"environments.blanketops.dev/name":             envName,
-		"environments.blanketops.dev/type":             envType,
-		"environments.blanketops.dev/api-version":      "v0.1.4",
-		"environments.blanketops.dev/contract-version": "v0.1.7",
+		"app.kubernetes.io/name":                         "blanketops-environments",
+		"app.kubernetes.io/part-of":                      "blanketops",
+		"app.kubernetes.io/managed-by":                   "kustomize",
+		"app.kubernetes.io/version":                      "v0.0.1",
+		"environments.blanketops.dev/name":               envName,
+		"environments.blanketops.dev/type":               envType,
+		"environments.blanketops.dev/api-version":        "v0.1.4",
+		"environments.blanketops.dev/contract-version":   "v0.1.7",
 		"environments.blanketops.dev/controller-version": "v0.2.3",
-		"environments.blanketops.dev/operator-version": "v0.2.1",
+		"environments.blanketops.dev/operator-version":   "v0.2.1",
 	}
 }
 

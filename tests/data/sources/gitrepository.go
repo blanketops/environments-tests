@@ -26,11 +26,12 @@ import (
 // Used to construct test fixtures without importing the full API type.
 //
 // Architectural role:
-//   GitRepository is the source registration CR. The controller reconciles
-//   a Crossplane GitHub webhook provider resource as an owned child —
-//   registering the webhook on GitHub via the API. On receipt of a webhook
-//   payload the cloudflared tunnel routes it into the cluster where the
-//   GitHubEvent controller processes it.
+//
+//	GitRepository is the source registration CR. The controller reconciles
+//	a Crossplane GitHub webhook provider resource as an owned child —
+//	registering the webhook on GitHub via the API. On receipt of a webhook
+//	payload the cloudflared tunnel routes it into the cluster where the
+//	GitHubEvent controller processes it.
 //
 // APIVersion: sources.blanketops.dev/v1alpha1
 type GitRepositoryData struct {
@@ -163,16 +164,16 @@ func NewGitRepositoryData(name, envName string) *GitRepositoryData {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Labels: map[string]string{
-				"app.kubernetes.io/name":                       "blanketops-environments",
-		        "app.kubernetes.io/part-of":                    "blanketops",
-		        "app.kubernetes.io/managed-by":                 "kustomize",
-		        "app.kubernetes.io/version":                    "v0.0.1",
-	            "environments.blanketops.dev/name":             envName,
-		        "environments.blanketops.dev/type":             "dev",
-		        "environments.blanketops.dev/api-version":      "v0.1.4",
-		        "environments.blanketops.dev/contract-version": "v0.1.7",
-		        "environments.blanketops.dev/controller-version": "v0.2.3",
-		        "environments.blanketops.dev/operator-version": "v0.2.1",
+				"app.kubernetes.io/name":                         "blanketops-environments",
+				"app.kubernetes.io/part-of":                      "blanketops",
+				"app.kubernetes.io/managed-by":                   "kustomize",
+				"app.kubernetes.io/version":                      "v0.0.1",
+				"environments.blanketops.dev/name":               envName,
+				"environments.blanketops.dev/type":               "dev",
+				"environments.blanketops.dev/api-version":        "v0.1.4",
+				"environments.blanketops.dev/contract-version":   "v0.1.7",
+				"environments.blanketops.dev/controller-version": "v0.2.3",
+				"environments.blanketops.dev/operator-version":   "v0.2.1",
 			},
 		},
 		Spec: GitRepositorySpec{
