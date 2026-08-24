@@ -17,9 +17,9 @@ package grpc_test
 
 // gRPC test suite
 //
-// BuildService and DeploymentService are wired as the reference
-// implementations: an in-process gRPC server (TestMain below) backed by
-// the real controller-runtime client against whatever cluster
+// BuildService, DeploymentService, and PackageService are wired as the
+// reference implementations: an in-process gRPC server (TestMain below)
+// backed by the real controller-runtime client against whatever cluster
 // KUBECONFIG resolves to — the same real-cluster connection tests/fake
 // uses, just with a gRPC service implementation as the seam instead of
 // a fake domain. No fakes, no mocks: Create/Get/etc. do real K8s CRUD,
@@ -27,14 +27,15 @@ package grpc_test
 // watch.
 //
 // The rest of the services below are still stubbed with t.Skip() —
-// follow build_server_test.go/build_grpc_test.go and
-// deployment_server_test.go/deployment_grpc_test.go as the pattern to
-// extend to each.
+// follow build_server_test.go/build_grpc_test.go,
+// deployment_server_test.go/deployment_grpc_test.go, and
+// package_server_test.go/package_grpc_test.go as the pattern to extend
+// to each.
 //
 // Covered services:
 //   BuildService          blanketops/environments/v1alpha1/build.proto       [wired]
 //   DeploymentService     blanketops/environments/v1/deployment.proto        [wired]
-//   PackageService        blanketops/environments/v1/package.proto
+//   PackageService        blanketops/environments/v1/package.proto           [wired]
 //   ServiceUnitService    blanketops/environments/v1alpha1/serviceunit.proto
 //   GitHubEventService    blanketops/events/v1alpha1/githubevent.proto
 //   GitRepositoryService  blanketops/sources/v1alpha1/gitrepository.proto
@@ -57,7 +58,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
+	// deploymentpb covers every service generated into the shared
+	// blanketops/environments/v1 package — currently DeploymentService
+	// and PackageService.
 	deploymentpb "github.com/blanketops/environments-contract/blanketops/environments/v1"
+	// buildpb covers every service generated into the shared
+	// blanketops/environments/v1alpha1 package — currently BuildService.
 	buildpb "github.com/blanketops/environments-contract/blanketops/environments/v1alpha1"
 )
 
@@ -103,6 +109,10 @@ func TestMain(m *testing.M) {
 		client:    k8sClient,
 		namespace: testNamespace,
 	})
+	deploymentpb.RegisterPackageServiceServer(grpcServer, &packageServer{
+		client:    k8sClient,
+		namespace: testNamespace,
+	})
 	go func() {
 		_ = grpcServer.Serve(lis)
 	}()
@@ -134,4 +144,9 @@ func buildClient(t *testing.T) buildpb.BuildServiceClient {
 func deploymentClient(t *testing.T) deploymentpb.DeploymentServiceClient {
 	t.Helper()
 	return deploymentpb.NewDeploymentServiceClient(grpcConn)
+}
+
+func packageClient(t *testing.T) deploymentpb.PackageServiceClient {
+	t.Helper()
+	return deploymentpb.NewPackageServiceClient(grpcConn)
 }
