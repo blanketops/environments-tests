@@ -17,8 +17,8 @@ package grpc_test
 
 // gRPC test suite
 //
-// BuildService, DeploymentService, PackageService, and
-// ServiceUnitService are wired as the reference implementations: an
+// BuildService, DeploymentService, PackageService, ServiceUnitService,
+// and GitHubEventService are wired as the reference implementations: an
 // in-process gRPC server (TestMain below) backed by the real
 // controller-runtime client against whatever cluster KUBECONFIG
 // resolves to — the same real-cluster connection tests/fake uses, just
@@ -29,8 +29,9 @@ package grpc_test
 // The rest of the services below are still stubbed with t.Skip() —
 // follow build_server_test.go/build_grpc_test.go,
 // deployment_server_test.go/deployment_grpc_test.go,
-// package_server_test.go/package_grpc_test.go, and
-// serviceunit_server_test.go/serviceunit_grpc_test.go as the pattern to
+// package_server_test.go/package_grpc_test.go,
+// serviceunit_server_test.go/serviceunit_grpc_test.go, and
+// githubevent_server_test.go/githubevent_grpc_test.go as the pattern to
 // extend to each.
 //
 // Covered services:
@@ -38,7 +39,7 @@ package grpc_test
 //   DeploymentService     blanketops/environments/v1/deployment.proto        [wired]
 //   PackageService        blanketops/environments/v1/package.proto           [wired]
 //   ServiceUnitService    blanketops/environments/v1alpha1/serviceunit.proto [wired]
-//   GitHubEventService    blanketops/events/v1alpha1/githubevent.proto
+//   GitHubEventService    blanketops/events/v1alpha1/githubevent.proto       [wired]
 //   GitRepositoryService  blanketops/sources/v1alpha1/gitrepository.proto
 //   RouteService          blanketops/networks/v1alpha1/route.proto
 //   DomainService         blanketops/networks/v1alpha1/domain.proto
@@ -59,6 +60,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
+	eventsv1alpha1 "github.com/blanketops/environments-api/api/events/v1alpha1"
+	githubeventpb "github.com/blanketops/environments-contract/blanketops/events/v1alpha1"
+
 	// deploymentpb covers every service generated into the shared
 	// blanketops/environments/v1 package — currently DeploymentService
 	// and PackageService.
@@ -84,6 +88,10 @@ var (
 // bufconn pipe instead of a separate binary.
 func TestMain(m *testing.M) {
 	if err := environmentsv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		fmt.Fprintln(os.Stderr, "add to scheme:", err)
+		os.Exit(1)
+	}
+	if err := eventsv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		fmt.Fprintln(os.Stderr, "add to scheme:", err)
 		os.Exit(1)
 	}
@@ -115,6 +123,10 @@ func TestMain(m *testing.M) {
 		namespace: testNamespace,
 	})
 	buildpb.RegisterServiceUnitServiceServer(grpcServer, &serviceUnitServer{
+		client:    k8sClient,
+		namespace: testNamespace,
+	})
+	githubeventpb.RegisterGitHubEventServiceServer(grpcServer, &githubEventServer{
 		client:    k8sClient,
 		namespace: testNamespace,
 	})
@@ -159,4 +171,9 @@ func packageClient(t *testing.T) deploymentpb.PackageServiceClient {
 func serviceUnitClient(t *testing.T) buildpb.ServiceUnitServiceClient {
 	t.Helper()
 	return buildpb.NewServiceUnitServiceClient(grpcConn)
+}
+
+func githubEventClient(t *testing.T) githubeventpb.GitHubEventServiceClient {
+	t.Helper()
+	return githubeventpb.NewGitHubEventServiceClient(grpcConn)
 }
