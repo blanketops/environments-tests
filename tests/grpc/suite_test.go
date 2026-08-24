@@ -17,26 +17,27 @@ package grpc_test
 
 // gRPC test suite
 //
-// BuildService, DeploymentService, and PackageService are wired as the
-// reference implementations: an in-process gRPC server (TestMain below)
-// backed by the real controller-runtime client against whatever cluster
-// KUBECONFIG resolves to — the same real-cluster connection tests/fake
-// uses, just with a gRPC service implementation as the seam instead of
-// a fake domain. No fakes, no mocks: Create/Get/etc. do real K8s CRUD,
-// Patch applies a real RFC 7396 merge patch, Watch opens a real k8s
-// watch.
+// BuildService, DeploymentService, PackageService, and
+// ServiceUnitService are wired as the reference implementations: an
+// in-process gRPC server (TestMain below) backed by the real
+// controller-runtime client against whatever cluster KUBECONFIG
+// resolves to — the same real-cluster connection tests/fake uses, just
+// with a gRPC service implementation as the seam instead of a fake
+// domain. No fakes, no mocks: Create/Get/etc. do real K8s CRUD, Patch
+// applies a real RFC 7396 merge patch, Watch opens a real k8s watch.
 //
 // The rest of the services below are still stubbed with t.Skip() —
 // follow build_server_test.go/build_grpc_test.go,
-// deployment_server_test.go/deployment_grpc_test.go, and
-// package_server_test.go/package_grpc_test.go as the pattern to extend
-// to each.
+// deployment_server_test.go/deployment_grpc_test.go,
+// package_server_test.go/package_grpc_test.go, and
+// serviceunit_server_test.go/serviceunit_grpc_test.go as the pattern to
+// extend to each.
 //
 // Covered services:
 //   BuildService          blanketops/environments/v1alpha1/build.proto       [wired]
 //   DeploymentService     blanketops/environments/v1/deployment.proto        [wired]
 //   PackageService        blanketops/environments/v1/package.proto           [wired]
-//   ServiceUnitService    blanketops/environments/v1alpha1/serviceunit.proto
+//   ServiceUnitService    blanketops/environments/v1alpha1/serviceunit.proto [wired]
 //   GitHubEventService    blanketops/events/v1alpha1/githubevent.proto
 //   GitRepositoryService  blanketops/sources/v1alpha1/gitrepository.proto
 //   RouteService          blanketops/networks/v1alpha1/route.proto
@@ -113,6 +114,10 @@ func TestMain(m *testing.M) {
 		client:    k8sClient,
 		namespace: testNamespace,
 	})
+	buildpb.RegisterServiceUnitServiceServer(grpcServer, &serviceUnitServer{
+		client:    k8sClient,
+		namespace: testNamespace,
+	})
 	go func() {
 		_ = grpcServer.Serve(lis)
 	}()
@@ -149,4 +154,9 @@ func deploymentClient(t *testing.T) deploymentpb.DeploymentServiceClient {
 func packageClient(t *testing.T) deploymentpb.PackageServiceClient {
 	t.Helper()
 	return deploymentpb.NewPackageServiceClient(grpcConn)
+}
+
+func serviceUnitClient(t *testing.T) buildpb.ServiceUnitServiceClient {
+	t.Helper()
+	return buildpb.NewServiceUnitServiceClient(grpcConn)
 }
