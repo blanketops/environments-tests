@@ -18,21 +18,23 @@ package grpc_test
 // gRPC test suite
 //
 // BuildService, DeploymentService, PackageService, ServiceUnitService,
-// and GitHubEventService are wired as the reference implementations: an
-// in-process gRPC server (TestMain below) backed by the real
-// controller-runtime client against whatever cluster KUBECONFIG
-// resolves to — the same real-cluster connection tests/fake uses, just
-// with a gRPC service implementation as the seam instead of a fake
-// domain. No fakes, no mocks: Create/Get/etc. do real K8s CRUD, Patch
-// applies a real RFC 7396 merge patch, Watch opens a real k8s watch.
+// GitHubEventService, and GitRepositoryService are wired as the
+// reference implementations: an in-process gRPC server (TestMain below)
+// backed by the real controller-runtime client against whatever cluster
+// KUBECONFIG resolves to — the same real-cluster connection tests/fake
+// uses, just with a gRPC service implementation as the seam instead of
+// a fake domain. No fakes, no mocks: Create/Get/etc. do real K8s CRUD,
+// Patch applies a real RFC 7396 merge patch, Watch opens a real k8s
+// watch.
 //
 // The rest of the services below are still stubbed with t.Skip() —
 // follow build_server_test.go/build_grpc_test.go,
 // deployment_server_test.go/deployment_grpc_test.go,
 // package_server_test.go/package_grpc_test.go,
-// serviceunit_server_test.go/serviceunit_grpc_test.go, and
-// githubevent_server_test.go/githubevent_grpc_test.go as the pattern to
-// extend to each.
+// serviceunit_server_test.go/serviceunit_grpc_test.go,
+// githubevent_server_test.go/githubevent_grpc_test.go, and
+// gitrepository_server_test.go/gitrepository_grpc_test.go as the
+// pattern to extend to each.
 //
 // Covered services:
 //   BuildService          blanketops/environments/v1alpha1/build.proto       [wired]
@@ -40,7 +42,7 @@ package grpc_test
 //   PackageService        blanketops/environments/v1/package.proto           [wired]
 //   ServiceUnitService    blanketops/environments/v1alpha1/serviceunit.proto [wired]
 //   GitHubEventService    blanketops/events/v1alpha1/githubevent.proto       [wired]
-//   GitRepositoryService  blanketops/sources/v1alpha1/gitrepository.proto
+//   GitRepositoryService  blanketops/sources/v1alpha1/gitrepository.proto    [wired]
 //   RouteService          blanketops/networks/v1alpha1/route.proto
 //   DomainService         blanketops/networks/v1alpha1/domain.proto
 
@@ -61,7 +63,9 @@ import (
 
 	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
 	eventsv1alpha1 "github.com/blanketops/environments-api/api/events/v1alpha1"
+	sourcesv1alpha1 "github.com/blanketops/environments-api/api/sources/v1alpha1"
 	githubeventpb "github.com/blanketops/environments-contract/blanketops/events/v1alpha1"
+	gitrepositorypb "github.com/blanketops/environments-contract/blanketops/sources/v1alpha1"
 
 	// deploymentpb covers every service generated into the shared
 	// blanketops/environments/v1 package — currently DeploymentService
@@ -92,6 +96,10 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	if err := eventsv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		fmt.Fprintln(os.Stderr, "add to scheme:", err)
+		os.Exit(1)
+	}
+	if err := sourcesv1alpha1.AddToScheme(scheme.Scheme); err != nil {
 		fmt.Fprintln(os.Stderr, "add to scheme:", err)
 		os.Exit(1)
 	}
@@ -127,6 +135,10 @@ func TestMain(m *testing.M) {
 		namespace: testNamespace,
 	})
 	githubeventpb.RegisterGitHubEventServiceServer(grpcServer, &githubEventServer{
+		client:    k8sClient,
+		namespace: testNamespace,
+	})
+	gitrepositorypb.RegisterGitRepositoryServiceServer(grpcServer, &gitRepositoryServer{
 		client:    k8sClient,
 		namespace: testNamespace,
 	})
@@ -176,4 +188,9 @@ func serviceUnitClient(t *testing.T) buildpb.ServiceUnitServiceClient {
 func githubEventClient(t *testing.T) githubeventpb.GitHubEventServiceClient {
 	t.Helper()
 	return githubeventpb.NewGitHubEventServiceClient(grpcConn)
+}
+
+func gitRepositoryClient(t *testing.T) gitrepositorypb.GitRepositoryServiceClient {
+	t.Helper()
+	return gitrepositorypb.NewGitRepositoryServiceClient(grpcConn)
 }
