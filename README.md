@@ -57,6 +57,21 @@ ownership semantics — without requiring a cluster. A fake that drifts from the
 reference controller is a bug in one of the two; the suite is how you find out
 which.
 
+`tests/fake/observers` is a variant of this: instead of a domain reconciler
+(via a fake domain injected into the real registry/engine), it drives the
+*observer* reconcilers directly — the side-channel layer under
+`environments-controller/internal/controller/observers` that watches non-
+BlanketOps infrastructure (Shipwright `BuildRun`, Argo Events `Sensor`) and
+reflects real-world outcomes back onto the owning CR (GitHubEvent→Build
+trigger mirroring, retry bookkeeping, success/failure conditions). Reaching
+these reconcilers from here required adding public `pkg/controller/observers/*`
+aliases in `environments-controller` (same pattern as the domain reconcilers'
+own `pkg/controller/{environments,events,networks,sources}` aliases) — they
+previously lived only under `internal/`, unreachable from any external module.
+This suite additionally needs the Shipwright `BuildRun` and Argo Events
+`Sensor` CRDs registered on the target cluster (not their controllers — same
+"drive fake objects directly" approach as everywhere else in this repo).
+
 ### `tests/grpc` — service conformance
 
 One test file per service (`BuildService`, `DeploymentService`,

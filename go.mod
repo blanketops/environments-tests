@@ -3,7 +3,7 @@ module github.com/blanketops/environments-tests
 go 1.26.4
 
 require (
-	github.com/blanketops/environments v0.8.2
+	github.com/blanketops/environments v0.8.3-0.20260827134756-d681bebbab58
 	github.com/blanketops/environments-api v0.2.9
 	github.com/blanketops/environments-contract v0.5.1
 	github.com/go-logr/logr v1.4.4
@@ -32,6 +32,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-containerregistry v0.21.7 // indirect
+	github.com/magefile/mage v1.17.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/redis/go-redis/v9 v9.22.0 // indirect
 	github.com/shipwright-io/build v0.20.11 // indirect
@@ -48,7 +49,7 @@ require (
 require (
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/blanketops/environments-controller v0.6.1
+	github.com/blanketops/environments-controller v0.6.2-0.20260827131926-2793d7429c19
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect

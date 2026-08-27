@@ -132,10 +132,14 @@ type BuildTriggerPolicy struct {
 type TriggerType string
 
 const (
-	TriggerTypeManual      TriggerType = "Manual"
-	TriggerTypePush        TriggerType = "Push"
-	TriggerTypePullRequest TriggerType = "PullRequest"
-	TriggerTypeSchedule    TriggerType = "Schedule"
+	// Lowercase to match the normalized form build-observer's
+	// normalizeEventType() compares against (it always lowercases the
+	// incoming GitHubEvent type before matching — there is no
+	// case-insensitive comparison, so these must already be lowercase).
+	TriggerTypeManual      TriggerType = "manual"
+	TriggerTypePush        TriggerType = "push"
+	TriggerTypePullRequest TriggerType = "pull_request"
+	TriggerTypeSchedule    TriggerType = "schedule"
 )
 
 // RetryPolicy defines retry behaviour on BuildRun failure.

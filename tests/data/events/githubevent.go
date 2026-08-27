@@ -60,9 +60,22 @@ type GitHubEventContract struct {
 	// Maps to the Argo Events EventSource github.events field.
 	EventType GitHubEventType `json:"eventType"`
 
+	// Provider-assigned delivery GUID for this specific event. Empty on a
+	// filter-declaration-only GitHubEvent (no payload received yet) — its
+	// presence is what githubevent-observer and build-observer treat as
+	// "a real webhook payload has arrived", not just spec intent.
+	EventID string `json:"eventId,omitempty"`
+
 	// Git ref filter — only events targeting this ref are processed.
 	// e.g. refs/heads/main, refs/heads/master, refs/tags/v1.0.0
 	Ref string `json:"ref"`
+
+	// Commit SHA carried by the webhook payload. Mirrored onto the owning
+	// Build's trigger-sha annotation by build-observer's applyTriggers.
+	CommitSHA string `json:"commitSHA,omitempty"`
+
+	// GitHub username or bot identity that produced the event.
+	Actor string `json:"actor,omitempty"`
 
 	// Webhook HMAC secret configuration.
 	// Used to verify GitHub payload signatures before processing.
@@ -168,7 +181,10 @@ func NewGitHubEventData(name, envName string) *GitHubEventData {
 			Contract: GitHubEventContract{
 				Repository: "ntlaletsi70/" + envName,
 				EventType:  GitHubEventTypePush,
+				EventID:    "delivery-" + name,
 				Ref:        "refs/heads/main",
+				CommitSHA:  "0123456789abcdef0123456789abcdef01234567",
+				Actor:      "ntlaletsi70",
 				Webhook: Webhook{
 					SecretRef: SecretRef{
 						Name: "github-webhook-secret",
