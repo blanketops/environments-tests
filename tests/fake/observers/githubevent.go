@@ -18,10 +18,10 @@ package observers
 import (
 	"context"
 
+	argoeventsv1alpha1 "github.com/argoproj/argo-events/pkg/apis/events/v1alpha1"
 	eventsv1alpha1 "github.com/blanketops/environments-api/api/events/v1alpha1"
 	githubeventobserver "github.com/blanketops/environments-controller/pkg/controller/observers/githubevent"
 	githubeventapplication "github.com/blanketops/environments/pkg/apis/githubevent/application"
-	argoeventsv1alpha1 "github.com/argoproj/argo-events/pkg/apis/events/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -97,7 +97,7 @@ var _ = Describe("GitHubEvent Observer", func() {
 		Expect(found).To(BeTrue(), "expected GitHubEventReceiving while the Sensor hasn't confirmed success")
 	})
 
-	It("marks GitHubEventReady once a payload has arrived and the Sensor reports success — the real sign-up confirmation", func() {
+	It("marks GitHubEventReady once the Sensor confirms success — the real sign-up confirmation", func() {
 		event := githubEventToAPI(eventtestdata.NewGitHubEventData(eventName, appName))
 		Expect(k8sClient.Create(ctx, event)).To(Succeed())
 

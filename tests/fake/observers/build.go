@@ -27,9 +27,9 @@ import (
 	buildrunobserver "github.com/blanketops/environments-controller/pkg/controller/observers/buildrun"
 	buildapplication "github.com/blanketops/environments/pkg/apis/build/application"
 	builddomain "github.com/blanketops/environments/pkg/apis/build/domain"
-	shipwrightv1alpha1 "github.com/shipwright-io/build/pkg/apis/build/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	shipwrightv1alpha1 "github.com/shipwright-io/build/pkg/apis/build/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -175,16 +175,21 @@ var _ = Describe("Build Observer", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			afterFirst := &environmentsv1alpha1.Build{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: buildName, Namespace: testNamespace}, afterFirst)).To(Succeed())
-			Expect(afterFirst.Annotations["build.blanketops.dev/trigger-sha"]).To(Equal("1111111111111111111111111111111111111111"))
+			afterFirstKey := types.NamespacedName{Name: buildName, Namespace: testNamespace}
+			Expect(k8sClient.Get(ctx, afterFirstKey, afterFirst)).To(Succeed())
+			wantSHA := "1111111111111111111111111111111111111111"
+			Expect(afterFirst.Annotations["build.blanketops.dev/trigger-sha"]).To(Equal(wantSHA))
 			rvAfterFirst := afterFirst.ResourceVersion
 
 			_, err = reconciler.Reconcile(ctx, req)
 			Expect(err).NotTo(HaveOccurred())
 
 			afterSecond := &environmentsv1alpha1.Build{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: buildName, Namespace: testNamespace}, afterSecond)).To(Succeed())
-			Expect(afterSecond.ResourceVersion).To(Equal(rvAfterFirst), "reconciling with an unchanged SHA should not produce a redundant patch")
+			Expect(k8sClient.Get(ctx, afterFirstKey, afterSecond)).To(Succeed())
+			Expect(afterSecond.ResourceVersion).To(
+				Equal(rvAfterFirst),
+				"reconciling with an unchanged SHA should not produce a redundant patch",
+			)
 		})
 	})
 
@@ -206,7 +211,10 @@ var _ = Describe("Build Observer", func() {
 
 		AfterEach(func() {
 			var runs shipwrightv1alpha1.BuildRunList
-			_ = k8sClient.List(ctx, &runs, client.InNamespace(testNamespace), client.MatchingLabels{"build.blanketops.dev/name": buildName})
+			_ = k8sClient.List(ctx, &runs,
+				client.InNamespace(testNamespace),
+				client.MatchingLabels{"build.blanketops.dev/name": buildName},
+			)
 			for i := range runs.Items {
 				_ = k8sClient.Delete(ctx, &runs.Items[i])
 			}
@@ -228,12 +236,17 @@ var _ = Describe("Build Observer", func() {
 			Expect(k8sClient.Create(ctx, noRetryBuild)).To(Succeed())
 			defer func() { _ = k8sClient.Delete(ctx, noRetryBuild) }()
 
-			setBuildStatus(ctx, noRetryBuild, builddomain.BuildStatus{Triggered: true, Success: false, ExecutionRef: "nonexistent"})
+			setBuildStatus(ctx, noRetryBuild, builddomain.BuildStatus{
+				Triggered:    true,
+				Success:      false,
+				ExecutionRef: "nonexistent",
+			})
 
 			reconcileBuild(noRetryBuild.Name)
 
 			updated := &environmentsv1alpha1.Build{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: noRetryBuild.Name, Namespace: testNamespace}, updated)).To(Succeed())
+			noRetryKey := types.NamespacedName{Name: noRetryBuild.Name, Namespace: testNamespace}
+			Expect(k8sClient.Get(ctx, noRetryKey, updated)).To(Succeed())
 			Expect(updated.Annotations["build.blanketops.dev/retry-attempt"]).To(BeEmpty())
 		})
 
@@ -254,7 +267,7 @@ var _ = Describe("Build Observer", func() {
 			Expect(updated.Annotations["build.blanketops.dev/retry-attempt"]).To(Equal("2"))
 		})
 
-		It("bumps retry-attempt from a real buildrun-observer outcome — the full observer chain, not hand-set status", func() {
+		It("bumps retry-attempt from a real buildrun-observer outcome, not hand-set status", func() {
 			run := buildRunFixture(buildName+"-run-chain", testNamespace, buildName)
 			Expect(k8sClient.Create(ctx, run)).To(Succeed())
 			run.Status.Conditions = shipwrightv1alpha1.Conditions{{
@@ -308,7 +321,10 @@ var _ = Describe("Build Observer", func() {
 
 			updated := &environmentsv1alpha1.Build{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: buildName, Namespace: testNamespace}, updated)).To(Succeed())
-			Expect(updated.Annotations["build.blanketops.dev/retry-attempt"]).To(BeEmpty(), "3 attempts already exist against MaxAttempts=3 — should not bump further")
+			Expect(updated.Annotations["build.blanketops.dev/retry-attempt"]).To(
+				BeEmpty(),
+				"3 attempts already exist against MaxAttempts=3 — should not bump further",
+			)
 		})
 
 		It("clears retry-attempt once the build succeeds", func() {

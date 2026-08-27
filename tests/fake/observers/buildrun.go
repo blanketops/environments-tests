@@ -21,11 +21,11 @@ import (
 
 	environmentsv1alpha1 "github.com/blanketops/environments-api/api/environments/v1alpha1"
 	buildrunobserver "github.com/blanketops/environments-controller/pkg/controller/observers/buildrun"
-	builddomain "github.com/blanketops/environments/pkg/apis/build/domain"
 	buildapplication "github.com/blanketops/environments/pkg/apis/build/application"
-	shipwrightv1alpha1 "github.com/shipwright-io/build/pkg/apis/build/v1alpha1"
+	builddomain "github.com/blanketops/environments/pkg/apis/build/domain"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	shipwrightv1alpha1 "github.com/shipwright-io/build/pkg/apis/build/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -86,9 +86,9 @@ var _ = Describe("BuildRun Observer", func() {
 		defer func() { _ = k8sClient.Delete(ctx, run) }()
 
 		run.Status.Conditions = shipwrightv1alpha1.Conditions{{
-			Type:   shipwrightv1alpha1.Succeeded,
+			Type:               shipwrightv1alpha1.Succeeded,
 			LastTransitionTime: metav1.Now(),
-			Status: corev1.ConditionTrue,
+			Status:             corev1.ConditionTrue,
 		}}
 		Expect(k8sClient.Status().Update(ctx, run)).To(Succeed())
 
