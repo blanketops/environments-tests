@@ -54,6 +54,29 @@ jobs:
         cd environments-install
         make install
 
+    - name: Install observer-layer CRDs
+      run: |
+        # tests/fake/observers drives Shipwright BuildRun and Argo Events
+        # Sensor objects directly (same "no controller, just the CRD"
+        # pattern as the BlanketOps CRDs above) — pull them straight from
+        # the already-downloaded Go module cache rather than fetching
+        # upstream release manifests separately.
+        go mod download github.com/shipwright-io/build github.com/argoproj/argo-events
+        BUILDRUN_CRD="$(go list -m -f '{{.Dir}}' github.com/shipwright-io/build)/deploy/crds/shipwright.io_buildruns.yaml"
+        SENSOR_CRD="$(go list -m -f '{{.Dir}}' github.com/argoproj/argo-events)/manifests/base/crds/argoproj.io_sensors.yaml"
+
+        # buildruns.shipwright.io exceeds kubectl apply's
+        # last-applied-configuration annotation size limit.
+        kubectl apply --server-side -f "$BUILDRUN_CRD"
+        kubectl apply -f "$SENSOR_CRD"
+
+        # BuildRun is multi-version (v1alpha1/v1beta1) with a conversion
+        # webhook pointing at Shipwright's own controller, which isn't
+        # installed here — these tests only ever touch it through the
+        # v1alpha1 client type, so disable conversion rather than standing
+        # up the full Shipwright operator just for CRD registration.
+        kubectl patch crd buildruns.shipwright.io --type merge -p '{"spec":{"conversion":{"strategy":"None","webhook":null}}}'
+
     - name: Resolve test path
       id: resolve
       run: |
