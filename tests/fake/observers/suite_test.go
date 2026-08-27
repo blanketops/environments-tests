@@ -100,6 +100,18 @@ var _ = BeforeSuite(func() {
 	if err := k8sClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}
+
+	// Build/BuildRun fixtures live in a namespace dedicated to this package
+	// rather than "default" — tests/grpc's ListBuilds scans "default"
+	// unscoped, and go test runs packages concurrently against the same
+	// shared cluster by default, so a Build sitting in "default" here (this
+	// package's applyRetry MaxAttempts scenario deliberately runs ~3s to
+	// get a deterministic BuildRun ordering) can get caught mid-flight by
+	// another package's list call.
+	observersNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "observers-test"}}
+	if err := k8sClient.Create(ctx, observersNS); err != nil && !apierrors.IsAlreadyExists(err) {
+		Expect(err).NotTo(HaveOccurred())
+	}
 })
 
 var _ = AfterSuite(func() {

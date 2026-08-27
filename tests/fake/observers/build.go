@@ -97,7 +97,7 @@ func buildRunFixture(name, namespace, buildName string) *shipwrightv1alpha1.Buil
 
 var _ = Describe("Build Observer", func() {
 	ctx := context.Background()
-	const testNamespace = "default"
+	const testNamespace = "observers-test"
 
 	// applyTriggers: mirrors GitHubEvent commit metadata onto Build
 	// annotations, cross-namespace, correlated by environments.blanketops.dev/name.

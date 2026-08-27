@@ -36,7 +36,7 @@ import (
 
 var _ = Describe("BuildRun Observer", func() {
 	ctx := context.Background()
-	const testNamespace = "default"
+	const testNamespace = "observers-test"
 	const (
 		appName   = "buildrun-app"
 		buildName = "build-buildrun-app"
