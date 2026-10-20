@@ -17,7 +17,7 @@ on:
 jobs:
   test:
     name: Run on ubuntu-latest
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: read
       checks: write
@@ -29,6 +29,11 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v5
       with:
+        # The self-hosted runners keep Go's module and build caches on a
+        # persistent volume. setup-go's own cache would upload them again
+        # after every job, which on these runners hangs "Post Setup Go" for
+        # up to an hour and holds the runner.
+        cache: false
         go-version-file: go.mod
 
     - name: Tidy dependencies
@@ -129,6 +134,7 @@ jobs:
     - name: Upload test report
       if: always()
       uses: actions/upload-artifact@v4
+      continue-on-error: true
       with:
         name: test-report-${{ github.run_number }}
         path: reports/
@@ -175,6 +181,7 @@ jobs:
     - name: Upload Allure report
       if: always()
       uses: actions/upload-artifact@v4
+      continue-on-error: true
       with:
         name: allure-report-${{ github.run_number }}
         path: allure-report/
