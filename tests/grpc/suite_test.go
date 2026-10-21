@@ -49,6 +49,9 @@ package grpc_test
 import (
 	"context"
 	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 	"os"
 	"testing"
@@ -76,10 +79,11 @@ import (
 	buildpb "github.com/blanketops/environments-contract/blanketops/environments/v1alpha1"
 )
 
-// testNamespace is the fixed namespace every gRPC service in this suite
-// operates in — matches tests/fake's convention. Real requests, real
-// cluster, one namespace to keep the reference implementation simple.
-const testNamespace = "default"
+// testNamespace is the namespace every gRPC service in this suite operates
+// in. It is this suite's own: `go test ./tests/...` runs the tests/fake
+// suites at the same time against the same API server, and the List calls
+// here must not see the objects those suites create.
+const testNamespace = "grpc-tests"
 
 var (
 	k8sClient client.WithWatch
@@ -113,6 +117,12 @@ func TestMain(m *testing.M) {
 	k8sClient, err = client.NewWithWatch(cfg, client.Options{Scheme: scheme.Scheme})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "new k8s client:", err)
+		os.Exit(1)
+	}
+
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}
+	if err := k8sClient.Create(context.Background(), ns); err != nil && !apierrors.IsAlreadyExists(err) {
+		fmt.Fprintln(os.Stderr, "create namespace:", err)
 		os.Exit(1)
 	}
 
