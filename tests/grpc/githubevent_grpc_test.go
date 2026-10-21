@@ -46,7 +46,7 @@ func newPushGitHubEventSpec() *githubeventpb.GitHubEventSpec {
 		Repository:       "ntlaletsi70/for-kaniko-app",
 		EventType:        &commonv1.GitHubEventType{Type: commonv1.GitHubEventType_GIT_HUB_EVENT_TYPE_PUSH},
 		Ref:              "refs/heads/main",
-		CommitSha:        "abc1234",
+		CommitSha:        testCommitSHA,
 		Actor:            "ntlaletsi70",
 		EventId:          "delivery-001",
 		WebhookSecretRef: "github-webhook-secret",

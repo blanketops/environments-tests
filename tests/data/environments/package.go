@@ -196,18 +196,7 @@ func NewPackageData(name, namespace, envName string) *PackageData {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name":                         "blanketops-environments",
-				"app.kubernetes.io/part-of":                      "blanketops",
-				"app.kubernetes.io/managed-by":                   "kustomize",
-				"app.kubernetes.io/version":                      "v0.0.1",
-				"environments.blanketops.dev/name":               envName,
-				"environments.blanketops.dev/type":               "dev",
-				"environments.blanketops.dev/api-version":        "v0.1.4",
-				"environments.blanketops.dev/contract-version":   "v0.1.7",
-				"environments.blanketops.dev/controller-version": "v0.2.3",
-				"environments.blanketops.dev/operator-version":   "v0.2.1",
-			},
+			Labels:    fixtureLabels(envName),
 		},
 		Spec: PackageSpec{
 			Contract: PackageContract{
@@ -231,7 +220,7 @@ func NewPackageData(name, namespace, envName string) *PackageData {
 					URL:         "git@github.com:ntlaletsi70/" + name + "-state.git",
 					Ref:         "master",
 					CloneSecret: "git-ssh-credentials-state",
-					Strategy:    "kustomization",
+					Strategy:    strategyKustomization,
 					Path:        "./clusters/dev",
 				},
 			},

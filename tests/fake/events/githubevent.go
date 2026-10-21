@@ -144,7 +144,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 			if err := k8sClient.Get(ctx, key, ge); errors.IsNotFound(err) {
 				Expect(
 					k8sClient.Create(ctx, gitHubEventFromData(
-						testdata.NewGitHubEventData(name, "for-kaniko-app"),
+						testdata.NewGitHubEventData(name, testEnvName),
 					)),
 				).To(Succeed())
 			}
@@ -286,20 +286,20 @@ var _ = Describe("GitHubEvent Controller", func() {
 				name:      "ge-push-main",
 				eventType: testdata.GitHubEventTypePush,
 				ref:       "refs/heads/main",
-				envName:   "for-kaniko-app",
+				envName:   testEnvName,
 			}),
 			// master ref — matches BuildTrigger ref in for-kaniko-app pipeline
 			Entry("push to master", gitHubEventTestCase{
 				name:      "ge-push-master",
 				eventType: testdata.GitHubEventTypePush,
 				ref:       "refs/heads/master",
-				envName:   "for-kaniko-app",
+				envName:   testEnvName,
 			}),
 			Entry("pull request", gitHubEventTestCase{
 				name:      "ge-pull-request",
 				eventType: testdata.GitHubEventTypePullRequest,
 				ref:       "refs/heads/main",
-				envName:   "for-kaniko-app",
+				envName:   testEnvName,
 			}),
 		)
 	})
@@ -313,7 +313,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 			const name = "ge-webhook-secret"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewGitHubEventData(name, "for-kaniko-app")
+			d := testdata.NewGitHubEventData(name, testEnvName)
 			Expect(k8sClient.Create(ctx, gitHubEventFromData(d))).To(Succeed())
 			DeferCleanup(func() {
 				ge := &eventsv1alpha1.GitHubEvent{}

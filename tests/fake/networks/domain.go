@@ -146,7 +146,7 @@ var _ = Describe("Domain Controller", func() {
 					k8sClient.Create(ctx, domainFromData(
 						testdata.NewPlatformDomainData(
 							name, testNamespace,
-							"api.dev.domain.co.za",
+							testHost,
 							"shopping-app-route",
 							"environment-sample",
 						),
@@ -301,24 +301,24 @@ var _ = Describe("Domain Controller", func() {
 			// Matches real CR: domain-for-kaniko-sample
 			Entry("platform — wildcard DNS01, mTLS enforced", domainTestCase{
 				name:         "domain-platform-mtls",
-				host:         "api.dev.domain.co.za",
+				host:         testHost,
 				tlsStrategy:  testdata.TLSStrategyPlatform,
 				mtlsEnforced: true,
-				renewBefore:  "720h",
+				renewBefore:  certDuration,
 			}),
 			Entry("platform — wildcard DNS01, no mTLS", domainTestCase{
 				name:         "domain-platform-no-mtls",
-				host:         "api.dev.domain.co.za",
+				host:         testHost,
 				tlsStrategy:  testdata.TLSStrategyPlatform,
 				mtlsEnforced: false,
-				renewBefore:  "720h",
+				renewBefore:  certDuration,
 			}),
 			Entry("custom — client-owned zone, HTTP01, mTLS enforced", domainTestCase{
 				name:         "domain-custom-mtls",
 				host:         "app.client-a.co.za",
 				tlsStrategy:  testdata.TLSStrategyCustom,
 				mtlsEnforced: true,
-				renewBefore:  "720h",
+				renewBefore:  certDuration,
 			}),
 		)
 	})
@@ -334,7 +334,7 @@ var _ = Describe("Domain Controller", func() {
 
 			d := testdata.NewPlatformDomainData(
 				name, testNamespace,
-				"api.dev.domain.co.za",
+				testHost,
 				"shopping-app-route",
 				"environment-sample",
 			)
@@ -366,7 +366,7 @@ var _ = Describe("Domain Controller", func() {
 			var contract testdata.DomainContract
 			Expect(json.Unmarshal(domObj.Spec.Contract.Raw, &contract)).To(Succeed())
 			Expect(contract.RouteRef.Name).To(Equal("shopping-app-route"))
-			Expect(contract.Host).To(Equal("api.dev.domain.co.za"))
+			Expect(contract.Host).To(Equal(testHost))
 		})
 	})
 

@@ -122,7 +122,7 @@ func packageFromData(d *testdata.PackageData) *environmentsv1.Package {
 var _ = Describe("Package Controller", func() {
 	ctx := context.Background()
 
-	const testNamespace = "default"
+	const testNamespace = defaultNamespace
 
 	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
@@ -286,21 +286,21 @@ var _ = Describe("Package Controller", func() {
 
 			Entry("kustomization — kapp-diff enabled", packageTestCase{
 				name:        "pkg-kustomize-diff",
-				strategy:    "kustomization",
+				strategy:    strategyKustomization,
 				kappDiff:    true,
 				stateBranch: "master",
 				statePath:   "./clusters/dev",
 			}),
 			Entry("kustomization — kapp-diff disabled", packageTestCase{
 				name:        "pkg-kustomize-no-diff",
-				strategy:    "kustomization",
+				strategy:    strategyKustomization,
 				kappDiff:    false,
 				stateBranch: "master",
 				statePath:   "./clusters/dev",
 			}),
 			Entry("kustomization — staging branch", packageTestCase{
 				name:        "pkg-kustomize-staging",
-				strategy:    "kustomization",
+				strategy:    strategyKustomization,
 				kappDiff:    true,
 				stateBranch: "main",
 				statePath:   "./clusters/staging",
@@ -414,7 +414,7 @@ var _ = Describe("Package Controller", func() {
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "does-not-exist",
+					Name:      missingName,
 					Namespace: testNamespace,
 				},
 			})
