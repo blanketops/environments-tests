@@ -139,7 +139,7 @@ var _ = Describe("Route Controller", func() {
 			if err := k8sClient.Get(ctx, key, r); errors.IsNotFound(err) {
 				Expect(
 					k8sClient.Create(ctx, routeFromData(
-						testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za", "for-kaniko-app"),
+						testdata.NewRouteData(name, testNamespace, testHost, "for-kaniko-app"),
 					)),
 				).To(Succeed())
 			}
@@ -289,7 +289,7 @@ var _ = Describe("Route Controller", func() {
 			// Matches real CR: shopping-app-route
 			Entry("platform domain — TLS enabled, kubernetes runtime", routeTestCase{
 				name:       "route-platform-tls",
-				host:       "api.dev.domain.co.za",
+				host:       testHost,
 				path:       "/",
 				tlsEnabled: true,
 				enabled:    true,
@@ -305,7 +305,7 @@ var _ = Describe("Route Controller", func() {
 			}),
 			Entry("platform domain — HTTP only, no TLS", routeTestCase{
 				name:       "route-http-only",
-				host:       "api.dev.domain.co.za",
+				host:       testHost,
 				path:       "/",
 				tlsEnabled: false,
 				enabled:    true,
@@ -313,7 +313,7 @@ var _ = Describe("Route Controller", func() {
 			}),
 			Entry("platform domain — Knative runtime", routeTestCase{
 				name:       "route-knative",
-				host:       "api.dev.domain.co.za",
+				host:       testHost,
 				path:       "/",
 				tlsEnabled: true,
 				enabled:    true,
@@ -321,7 +321,7 @@ var _ = Describe("Route Controller", func() {
 			}),
 			Entry("platform domain — disabled route", routeTestCase{
 				name:       "route-disabled",
-				host:       "api.dev.domain.co.za",
+				host:       testHost,
 				path:       "/",
 				tlsEnabled: true,
 				enabled:    false,
@@ -337,7 +337,7 @@ var _ = Describe("Route Controller", func() {
 			const name = "route-sub-path"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewRouteData(name, testNamespace, "api.dev.domain.co.za", "for-kaniko-app")
+			d := testdata.NewRouteData(name, testNamespace, testHost, "for-kaniko-app")
 			d.Spec.Path = "/api/v1"
 			Expect(k8sClient.Create(ctx, routeFromData(d))).To(Succeed())
 			DeferCleanup(func() {
@@ -367,7 +367,7 @@ var _ = Describe("Route Controller", func() {
 			var contract testdata.RouteSpec
 			Expect(json.Unmarshal(routeObj.Spec.Contract.Raw, &contract)).To(Succeed())
 			Expect(contract.Path).To(Equal("/api/v1"))
-			Expect(contract.Host).To(Equal("api.dev.domain.co.za"))
+			Expect(contract.Host).To(Equal(testHost))
 		})
 	})
 

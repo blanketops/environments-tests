@@ -96,7 +96,7 @@ var _ = BeforeSuite(func() {
 
 	// GitHubEvent CRs live in the argo-events namespace by convention — this
 	// is fixture setup for these tests, not standing up the environment.
-	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "argo-events"}}
+	ns := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: argoEventsNamespace}}
 	if err := k8sClient.Create(ctx, ns); err != nil && !apierrors.IsAlreadyExists(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}

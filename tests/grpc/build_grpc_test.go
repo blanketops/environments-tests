@@ -47,7 +47,7 @@ func newBuildSpec() *buildpb.BuildSpec {
 		},
 		Source: &buildpb.GitSource{
 			Url:         "git@github.com:ntlaletsi70/blanketops-app.git",
-			Revision:    "main",
+			Revision:    mainBranch,
 			ContextDir:  ".",
 			SslVerify:   true,
 			CloneSecret: "github-ssh-credentials",
@@ -214,7 +214,7 @@ func TestBuildService_TriggerBuild(t *testing.T) {
 
 	resp, err := c.TriggerBuild(ctx, &buildpb.TriggerBuildRequest{
 		Name:   created.GetMetadata().GetName(),
-		Params: []*buildpb.Param{{Name: "commit-sha", Value: "abc1234"}},
+		Params: []*buildpb.Param{{Name: "commit-sha", Value: testCommitSHA}},
 	})
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.GetExecutionRef())
@@ -227,7 +227,7 @@ func TestBuildService_TriggerBuild(t *testing.T) {
 
 	var foundOverride bool
 	for _, p := range getResp.GetBuild().GetSpec().GetParams() {
-		if p.GetName() == "commit-sha" && p.GetValue() == "abc1234" {
+		if p.GetName() == "commit-sha" && p.GetValue() == testCommitSHA {
 			foundOverride = true
 		}
 	}

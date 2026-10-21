@@ -16,7 +16,7 @@ on:
 
 # The environments-install release whose CRDs the tests run against.
 env:
-  ENVIRONMENTS_INSTALL_REF: v0.2.5
+  ENVIRONMENTS_INSTALL_REF: v0.2.6
 
 jobs:
   test:

@@ -51,13 +51,13 @@ func newPackageSpec() *deploymentpb.PackageSpec {
 		},
 		Repository: &deploymentpb.PackageRepository{
 			Url:               "git@github.com:ntlaletsi70/for-kaniko-app-package.git",
-			CredentialsSecret: "git-ssh-credentials",
+			CredentialsSecret: gitSSHSecret,
 		},
 		DiffEnabled: true,
 		StateRepository: &deploymentpb.StateRepository{
 			Url:         "git@github.com:ntlaletsi70/for-kaniko-app-state.git",
-			Ref:         "main",
-			CloneSecret: "git-ssh-credentials",
+			Ref:         mainBranch,
+			CloneSecret: gitSSHSecret,
 			Strategy:    "kustomization",
 			Path:        "./clusters/dev",
 		},

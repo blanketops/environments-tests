@@ -110,7 +110,8 @@ const (
 
 	// DeploymentRuntimeKnative — Knative Serving.
 	// Requires Knative Serving + Kourier installed on the cluster.
-	DeploymentRuntimeKnative DeploymentRuntimeValue = "knative.io/serving"
+	// The engine's resolver accepts "knative" (not "knative.io/serving").
+	DeploymentRuntimeKnative DeploymentRuntimeValue = "knative"
 
 	// DeploymentRuntimeECS — AWS Elastic Container Service. Planned.
 	DeploymentRuntimeECS DeploymentRuntimeValue = "aws.amazon.com/ecs"
@@ -225,24 +226,13 @@ const (
 func NewDeploymentData(name, namespace, envName string) *DeploymentData {
 	return &DeploymentData{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "environments.blanketops.dev/v1alpha1",
+			APIVersion: apiVersionV1alpha1,
 			Kind:       "Deployment",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
-			Labels: map[string]string{
-				"app.kubernetes.io/name":                         "blanketops-environments",
-				"app.kubernetes.io/part-of":                      "blanketops",
-				"app.kubernetes.io/managed-by":                   "kustomize",
-				"app.kubernetes.io/version":                      "v0.0.1",
-				"environments.blanketops.dev/name":               envName,
-				"environments.blanketops.dev/type":               "dev",
-				"environments.blanketops.dev/api-version":        "v0.1.4",
-				"environments.blanketops.dev/contract-version":   "v0.1.7",
-				"environments.blanketops.dev/controller-version": "v0.2.3",
-				"environments.blanketops.dev/operator-version":   "v0.2.1",
-			},
+			Labels:    fixtureLabels(envName),
 		},
 		Spec: DeploymentSpec{
 			Contract: DeploymentContract{
@@ -255,7 +245,7 @@ func NewDeploymentData(name, namespace, envName string) *DeploymentData {
 				ManifestsRepo: ManifestsRepo{
 					URL:         "ssh://git@github.com/ntlaletsi70/" + name + "-manifests.git",
 					CloneSecret: "git-ssh-credentials",
-					Strategy:    "kustomization",
+					Strategy:    strategyKustomization,
 					Path:        "./overlays/dev",
 				},
 			},
@@ -273,7 +263,7 @@ func NewMultiUnitDeploymentData(name, namespace, envName string) *DeploymentData
 	d.Spec.Contract.ManifestsRepo = ManifestsRepo{
 		URL:         "git@github.com:ntlaletsi70/" + name + "-manifests.git",
 		CloneSecret: "git-ssh-credentials",
-		Strategy:    "kustomization",
+		Strategy:    strategyKustomization,
 		Path:        "./bases/kustomization.yaml",
 	}
 	return d

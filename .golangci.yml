@@ -32,6 +32,9 @@ linters:
     modernize:
       disable:
       - omitzero
+      # Go 1.27 lets a struct literal set an embedded struct's fields
+      # directly; kept in the explicit form, as in environments-controller.
+      - embedlit
   exclusions:
     generated: lax
     rules:

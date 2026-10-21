@@ -22,7 +22,7 @@ package grpc_test
 //
 // GitHubEvent CRs conventionally live in the argo-events namespace in
 // production (see the stub's own comment), but this server uses the
-// same shared testNamespace ("default") as every other service here —
+// same shared testNamespace ("grpc-tests") as every other service here —
 // nothing in this suite runs the real controller that would reconcile
 // the owned EventSource/EventBus/Sensor into argo-events, so there's no
 // real behavior tied to that namespace to exercise.

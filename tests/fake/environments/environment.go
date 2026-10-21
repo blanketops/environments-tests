@@ -120,7 +120,7 @@ func validEnvironment(name string, environmentType string) *environmentsv1alpha1
 	return &environmentsv1alpha1.Environment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: "default",
+			Namespace: defaultNamespace,
 		},
 		Spec: environmentsv1alpha1.EnvironmentSpec{
 			Contract: runtime.RawExtension{Raw: raw},
@@ -141,7 +141,7 @@ var _ = Describe("Environment Controller", func() {
 
 		key := types.NamespacedName{
 			Name:      name,
-			Namespace: "default",
+			Namespace: defaultNamespace,
 		}
 
 		BeforeEach(func() {
@@ -219,7 +219,7 @@ var _ = Describe("Environment Controller", func() {
 			func(tc testCase) {
 				key := types.NamespacedName{
 					Name:      tc.name,
-					Namespace: "default",
+					Namespace: defaultNamespace,
 				}
 
 				environment := validEnvironment(tc.name, tc.environmentType)

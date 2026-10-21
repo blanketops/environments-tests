@@ -49,17 +49,17 @@ var _ = Describe("GitHubEvent Observer", func() {
 	reconcileEvent := func() {
 		reconciler := newReconciler()
 		_, err := reconciler.Reconcile(ctx, reconcile.Request{
-			NamespacedName: types.NamespacedName{Name: eventName, Namespace: "argo-events"},
+			NamespacedName: types.NamespacedName{Name: eventName, Namespace: argoEventsNamespace},
 		})
 		Expect(err).NotTo(HaveOccurred())
 	}
 
 	AfterEach(func() {
 		_ = k8sClient.Delete(ctx, &eventsv1alpha1.GitHubEvent{
-			ObjectMeta: metav1.ObjectMeta{Name: eventName, Namespace: "argo-events"},
+			ObjectMeta: metav1.ObjectMeta{Name: eventName, Namespace: argoEventsNamespace},
 		})
 		_ = k8sClient.Delete(ctx, &argoeventsv1alpha1.Sensor{
-			ObjectMeta: metav1.ObjectMeta{Name: "github-sensor-" + eventName, Namespace: "argo-events"},
+			ObjectMeta: metav1.ObjectMeta{Name: "github-sensor-" + eventName, Namespace: argoEventsNamespace},
 		})
 	})
 
@@ -72,7 +72,8 @@ var _ = Describe("GitHubEvent Observer", func() {
 		reconcileEvent()
 
 		updated := &eventsv1alpha1.GitHubEvent{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: eventName, Namespace: "argo-events"}, updated)).To(Succeed())
+		key := types.NamespacedName{Name: eventName, Namespace: argoEventsNamespace}
+		Expect(k8sClient.Get(ctx, key, updated)).To(Succeed())
 		Expect(updated.Status.Contract.Raw).To(BeEmpty())
 		Expect(updated.Status.Conditions).To(BeEmpty())
 	})
@@ -86,7 +87,8 @@ var _ = Describe("GitHubEvent Observer", func() {
 		reconcileEvent()
 
 		updated := &eventsv1alpha1.GitHubEvent{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: eventName, Namespace: "argo-events"}, updated)).To(Succeed())
+		key := types.NamespacedName{Name: eventName, Namespace: argoEventsNamespace}
+		Expect(k8sClient.Get(ctx, key, updated)).To(Succeed())
 
 		found := false
 		for _, c := range updated.Status.Conditions {
@@ -104,7 +106,7 @@ var _ = Describe("GitHubEvent Observer", func() {
 		sensor := &argoeventsv1alpha1.Sensor{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "github-sensor-" + eventName,
-				Namespace: "argo-events",
+				Namespace: argoEventsNamespace,
 			},
 		}
 		Expect(k8sClient.Create(ctx, sensor)).To(Succeed())
@@ -117,7 +119,8 @@ var _ = Describe("GitHubEvent Observer", func() {
 		reconcileEvent()
 
 		updated := &eventsv1alpha1.GitHubEvent{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: eventName, Namespace: "argo-events"}, updated)).To(Succeed())
+		key := types.NamespacedName{Name: eventName, Namespace: argoEventsNamespace}
+		Expect(k8sClient.Get(ctx, key, updated)).To(Succeed())
 
 		found := false
 		for _, c := range updated.Status.Conditions {
