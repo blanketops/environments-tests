@@ -14,9 +14,13 @@ on:
         required: false
         default: ""
 
+# The environments-install release whose CRDs the tests run against.
+env:
+  ENVIRONMENTS_INSTALL_REF: v0.2.5
+
 jobs:
   test:
-    name: Run on ubuntu-latest
+    name: Tests (envtest)
     runs-on: self-hosted
     permissions:
       contents: read
@@ -36,27 +40,36 @@ jobs:
         cache: false
         go-version-file: go.mod
 
-    - name: Tidy dependencies
-      run: go mod tidy
+    # The committed go.mod/go.sum are authoritative; `go mod tidy` in CI
+    # re-resolves the module graph and can pull in untested versions.
+    - name: Download modules
+      run: go mod download
 
-    - name: Install kind
+    # The runner pods have no Docker daemon, so kind cannot run here, and a
+    # privileged Docker sidecar would give PR code root on the node. The
+    # tests only need CRDs and the API (no controller, no pods), so etcd and
+    # kube-apiserver from envtest (baked into the runner image) run as the
+    # runner user. envtest-up exports KUBECONFIG for the steps below.
+    - name: Start the Kubernetes API (envtest)
       run: |
-        curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-$(go env GOARCH)
-        chmod +x ./kind
-        sudo mv ./kind /usr/local/bin/kind
-
-    - name: Create kind cluster
-      run: kind create cluster --wait 120s
+        envtest-up
+        kubectl version
 
     - name: Checkout environments-install
       uses: actions/checkout@v4
       with:
         repository: blanketops/environments-install
+        ref: ${{ env.ENVIRONMENTS_INSTALL_REF }}
         path: environments-install
 
     - name: Install CRDs
       run: |
         cd environments-install
+        # The Makefile downloads kustomize into bin/ unless it is there;
+        # use the runner image's copy (same version, KUSTOMIZE_VERSION).
+        mkdir -p bin
+        cp "$(command -v kustomize)" bin/kustomize
+        touch bin/kustomize
         make install
 
     - name: Install observer-layer CRDs
@@ -140,9 +153,16 @@ jobs:
         path: reports/
         retention-days: 15
 
+    # The Allure steps only build a report. allure-commandline needs Java,
+    # which the runner image does not have yet, so they do not fail the job;
+    # the test result above is what passes or fails it. The runner user
+    # cannot write to npm's global prefix, so Allure goes under RUNNER_TEMP.
     - name: Install Allure CLI
       if: always()
-      run: npm install -g allure-commandline
+      continue-on-error: true
+      run: |
+        npm install --prefix "${RUNNER_TEMP}/allure" allure-commandline
+        echo "${RUNNER_TEMP}/allure/node_modules/.bin" >> "$GITHUB_PATH"
 
     - name: Restore Allure history
       if: always()
@@ -163,6 +183,7 @@ jobs:
 
     - name: Generate Allure report
       if: always()
+      continue-on-error: true
       run: |
         # Allure2 auto-detects JUnit XML in the input directory — no native
         # allure-results needed for a go test / go-junit-report pipeline.
@@ -173,6 +194,7 @@ jobs:
 
     - name: Persist Allure history
       if: always()
+      continue-on-error: true
       run: |
         mkdir -p allure-history
         rm -rf allure-history/history
