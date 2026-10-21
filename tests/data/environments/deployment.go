@@ -110,7 +110,8 @@ const (
 
 	// DeploymentRuntimeKnative — Knative Serving.
 	// Requires Knative Serving + Kourier installed on the cluster.
-	DeploymentRuntimeKnative DeploymentRuntimeValue = "knative.io/serving"
+	// The engine's resolver accepts "knative" (not "knative.io/serving").
+	DeploymentRuntimeKnative DeploymentRuntimeValue = "knative"
 
 	// DeploymentRuntimeECS — AWS Elastic Container Service. Planned.
 	DeploymentRuntimeECS DeploymentRuntimeValue = "aws.amazon.com/ecs"
