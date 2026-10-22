@@ -1,12 +1,16 @@
 name: Lint
 
+# Pushes run only on the long-lived branches; work branches run through their
+# pull request. With both triggers on every branch, each check ran twice on a
+# pull request and queued twice on the repository's single runner.
 on:
   push:
+    branches: [test, master]
   pull_request:
 
 jobs:
   lint:
-    name: Run on ubuntu-latest
+    name: golangci-lint
     runs-on: self-hosted
     steps:
       - name: Clone the code

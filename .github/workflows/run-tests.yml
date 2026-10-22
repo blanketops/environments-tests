@@ -1,7 +1,10 @@
-name: Run Tests
+name: Suite Tests
 
+# Pushes run only on the long-lived branches; work branches run through their
+# pull request (see lint.yml).
 on:
   push:
+    branches: [test, master]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -20,7 +23,7 @@ env:
 
 jobs:
   test:
-    name: Tests (envtest)
+    name: fake and gRPC suites (envtest)
     runs-on: self-hosted
     permissions:
       contents: read
