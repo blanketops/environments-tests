@@ -111,9 +111,16 @@ self-hosted`), on pull requests and on pushes to `test` and `master`:
 | Data Tests (`test.yml`) | Fixtures and conformance (tests/data) | `make test`: the fixture builders and engine conformance tests, no cluster |
 | Suite Tests (`run-tests.yml`) | fake and gRPC suites (envtest) | `tests/fake` and `tests/grpc` against an envtest API server with the CRDs from environments-install; JUnit and Allure reports as artifacts, and a results table in the job summary |
 
-`create-test.yml` still opens a tracking issue per test file, but only on
-merges into `main`, a branch this repository does not have, so it never
-fires. test-helper (blanketops/environments-bots) replaces it.
+Each test file has a tracking issue, `[test] <path under tests/>` (e.g.
+`[test] fake/networks/route_test`), labelled `test-tracking` and its layer.
+A test file is a `*_test.go` file under `tests/` (`tests/data` excluded)
+that declares Go test functions or top-level Ginkgo containers. Suite Tests
+runs test-helper (blanketops/environments-bots) with the job's
+`GITHUB_TOKEN`: before the tests, `test-helper sync` opens issues for new
+test files, including those a pull request adds; after them, `test-helper
+report` comments every file's results on its issue (each test's result
+and time, failure and skip output, a link to the run). Neither step can fail
+the job.
 
 ## Conventions
 
