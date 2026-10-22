@@ -216,16 +216,13 @@ jobs:
         path: reports/
         retention-days: 15
 
-    # The Allure steps only build a report. allure-commandline needs Java,
-    # which the runner image does not have yet, so they do not fail the job;
-    # the test result above is what passes or fails it. The runner user
-    # cannot write to npm's global prefix, so Allure goes under RUNNER_TEMP.
-    - name: Install Allure CLI
+    # The Allure steps only build a report, so they do not fail the job; the
+    # test result above is what passes or fails it. Java and the Allure CLI
+    # come from the runner image (zenith-runner-toolchain 1.0.13 and later).
+    - name: Allure version
       if: always()
       continue-on-error: true
-      run: |
-        npm install --prefix "${RUNNER_TEMP}/allure" allure-commandline
-        echo "${RUNNER_TEMP}/allure/node_modules/.bin" >> "$GITHUB_PATH"
+      run: allure --version
 
     - name: Restore Allure history
       if: always()
