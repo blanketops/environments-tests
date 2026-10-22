@@ -123,7 +123,7 @@ func serviceUnitFromData(d *testdata.ServiceUnitData) *environmentsv1alpha1.Serv
 var _ = Describe("ServiceUnit Controller", func() {
 	ctx := context.Background()
 
-	const testNamespace = "default"
+	const testNamespace = defaultNamespace
 
 	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
@@ -383,7 +383,7 @@ var _ = Describe("ServiceUnit Controller", func() {
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "does-not-exist",
+					Name:      missingName,
 					Namespace: testNamespace,
 				},
 			})

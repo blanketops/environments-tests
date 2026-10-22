@@ -22,10 +22,15 @@ jobs:
           cache: false
           go-version-file: go.mod
 
+      # golangci-lint is baked into the runner image (2.14.0, built with Go
+      # 1.27). `make lint` installs the Makefile's pinned copy, which an older
+      # Go would build into a binary that cannot load Go 1.27 packages.
       - name: Check linter configuration
-        run: make lint-config
+        run: |
+          golangci-lint version
+          golangci-lint config verify
       - name: Run linter
-        run: make lint
+        run: golangci-lint run
 
       - name: Summary
         if: always()

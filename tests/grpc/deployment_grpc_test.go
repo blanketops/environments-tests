@@ -42,15 +42,15 @@ import (
 
 func newDeploymentSpec() *deploymentpb.DeploymentSpec {
 	return &deploymentpb.DeploymentSpec{
-		ServiceUnits: []string{"for-kaniko-app-api"},
+		ServiceUnits: []string{apiUnit},
 		Runtime: &commonv1.DeploymentRuntime{
 			Runtime: commonv1.DeploymentRuntime_DEPLOYMENT_RUNTIME_KUBERNETES_CONTAINER,
 		},
 		ImageAutomation: false,
 		ManifestsRepo: &deploymentpb.ManifestsRepo{
 			Url:         "git@github.com:ntlaletsi70/for-kaniko-app-manifests.git",
-			Ref:         "main",
-			CloneSecret: "git-ssh-credentials",
+			Ref:         mainBranch,
+			CloneSecret: gitSSHSecret,
 			Strategy:    "kustomize",
 			Path:        "./overlays/dev",
 		},
@@ -85,7 +85,7 @@ func TestDeploymentService_CreateDeployment(t *testing.T) {
 
 	assert.NotEmpty(t, deployment.GetMetadata().GetName())
 	assert.NotEmpty(t, deployment.GetMetadata().GetId())
-	assert.Equal(t, []string{"for-kaniko-app-api"}, deployment.GetSpec().GetServiceUnits())
+	assert.Equal(t, []string{apiUnit}, deployment.GetSpec().GetServiceUnits())
 	assert.Equal(t,
 		commonv1.DeploymentRuntime_DEPLOYMENT_RUNTIME_KUBERNETES_CONTAINER,
 		deployment.GetSpec().GetRuntime().GetRuntime(),
@@ -111,7 +111,7 @@ func TestDeploymentService_UpdateDeployment(t *testing.T) {
 	created := createTestDeployment(t, c)
 
 	newSpec := newDeploymentSpec()
-	newSpec.ServiceUnits = []string{"for-kaniko-app-api", "for-kaniko-app-worker"}
+	newSpec.ServiceUnits = []string{apiUnit, workerUnit}
 	newSpec.ImageAutomation = true
 
 	resp, err := c.UpdateDeployment(ctx, &deploymentpb.UpdateDeploymentRequest{
@@ -121,7 +121,7 @@ func TestDeploymentService_UpdateDeployment(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	wantUnits := []string{"for-kaniko-app-api", "for-kaniko-app-worker"}
+	wantUnits := []string{apiUnit, workerUnit}
 	assert.Equal(t, wantUnits, resp.GetDeployment().GetSpec().GetServiceUnits())
 	assert.True(t, resp.GetDeployment().GetSpec().GetImageAutomation())
 
@@ -145,7 +145,7 @@ func TestDeploymentService_PatchDeployment(t *testing.T) {
 
 	assert.True(t, resp.GetDeployment().GetSpec().GetImageAutomation())
 	// Fields outside the patch survive untouched.
-	assert.Equal(t, []string{"for-kaniko-app-api"}, resp.GetDeployment().GetSpec().GetServiceUnits())
+	assert.Equal(t, []string{apiUnit}, resp.GetDeployment().GetSpec().GetServiceUnits())
 	assert.Equal(t, "kustomize", resp.GetDeployment().GetSpec().GetManifestsRepo().GetStrategy())
 }
 
@@ -274,7 +274,7 @@ func TestDeploymentService_MultiUnitDeployment(t *testing.T) {
 	c := deploymentClient(t)
 
 	spec := newDeploymentSpec()
-	spec.ServiceUnits = []string{"for-kaniko-app-api", "for-kaniko-app-worker"}
+	spec.ServiceUnits = []string{apiUnit, workerUnit}
 	spec.ImageAutomation = true
 
 	resp, err := c.CreateDeployment(context.Background(), &deploymentpb.CreateDeploymentRequest{Spec: spec})
@@ -284,7 +284,7 @@ func TestDeploymentService_MultiUnitDeployment(t *testing.T) {
 		_, _ = c.DeleteDeployment(context.Background(), &deploymentpb.DeleteDeploymentRequest{Name: name})
 	})
 
-	wantUnits := []string{"for-kaniko-app-api", "for-kaniko-app-worker"}
+	wantUnits := []string{apiUnit, workerUnit}
 	assert.Equal(t, wantUnits, resp.GetDeployment().GetSpec().GetServiceUnits())
 	assert.True(t, resp.GetDeployment().GetSpec().GetImageAutomation())
 }

@@ -42,7 +42,7 @@ import (
 )
 
 // buildToAPI converts a testdata.BuildData into the real Build API type,
-// same conversion point pattern as tests/fake/environments/build.go.
+// same conversion point pattern as tests/fake/environments/build_test.go.
 func buildToAPI(d *buildtestdata.BuildData) *environmentsv1alpha1.Build {
 	raw, err := json.Marshal(d.Spec)
 	if err != nil {
@@ -58,7 +58,7 @@ func buildToAPI(d *buildtestdata.BuildData) *environmentsv1alpha1.Build {
 
 // githubEventToAPI converts a testdata.GitHubEventData into the real
 // GitHubEvent API type. Same conversion point pattern as
-// tests/fake/events/githubevent.go's gitHubEventFromData.
+// tests/fake/events/githubevent_test.go's gitHubEventFromData.
 func githubEventToAPI(d *eventtestdata.GitHubEventData) *eventsv1alpha1.GitHubEvent {
 	raw, err := json.Marshal(d.Spec.Contract)
 	if err != nil {
@@ -82,14 +82,18 @@ func setBuildStatus(ctx context.Context, build *environmentsv1alpha1.Build, stat
 	Expect(k8sClient.Status().Update(ctx, build)).To(Succeed())
 }
 
+// observersNamespace is the namespace the observer suites run in; the
+// suite creates it (suite_test.go).
+const observersNamespace = "observers-test"
+
 // buildRunFixture returns a Shipwright BuildRun labeled to correlate with
 // the given Build, matching what build-observer's applyRetry looks up by
 // build.blanketops.dev/name.
-func buildRunFixture(name, namespace, buildName string) *shipwrightv1alpha1.BuildRun {
+func buildRunFixture(name, buildName string) *shipwrightv1alpha1.BuildRun {
 	return &shipwrightv1alpha1.BuildRun{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: namespace,
+			Namespace: observersNamespace,
 			Labels:    map[string]string{"build.blanketops.dev/name": buildName},
 		},
 	}
@@ -118,7 +122,7 @@ var _ = Describe("Build Observer", func() {
 		AfterEach(func() {
 			_ = k8sClient.Delete(ctx, build)
 			_ = k8sClient.Delete(ctx, &eventsv1alpha1.GitHubEvent{
-				ObjectMeta: metav1.ObjectMeta{Name: eventName, Namespace: "argo-events"},
+				ObjectMeta: metav1.ObjectMeta{Name: eventName, Namespace: argoEventsNamespace},
 			})
 		})
 
@@ -251,7 +255,7 @@ var _ = Describe("Build Observer", func() {
 		})
 
 		It("bumps retry-attempt when the latest BuildRun failed and attempts remain", func() {
-			run := buildRunFixture(buildName+"-run-1", testNamespace, buildName)
+			run := buildRunFixture(buildName+"-run-1", buildName)
 			Expect(k8sClient.Create(ctx, run)).To(Succeed())
 
 			setBuildStatus(ctx, build, builddomain.BuildStatus{
@@ -268,7 +272,7 @@ var _ = Describe("Build Observer", func() {
 		})
 
 		It("bumps retry-attempt from a real buildrun-observer outcome, not hand-set status", func() {
-			run := buildRunFixture(buildName+"-run-chain", testNamespace, buildName)
+			run := buildRunFixture(buildName+"-run-chain", buildName)
 			Expect(k8sClient.Create(ctx, run)).To(Succeed())
 			run.Status.Conditions = shipwrightv1alpha1.Conditions{{
 				Type:               shipwrightv1alpha1.Succeeded,
@@ -302,8 +306,8 @@ var _ = Describe("Build Observer", func() {
 			// second-granularity, so space creation out to get a
 			// deterministic "latest" for the race guard.
 			var latest *shipwrightv1alpha1.BuildRun
-			for i := 0; i < 3; i++ {
-				run := buildRunFixture(fmt.Sprintf("%s-run-%d", buildName, i), testNamespace, buildName)
+			for i := range 3 {
+				run := buildRunFixture(fmt.Sprintf("%s-run-%d", buildName, i), buildName)
 				Expect(k8sClient.Create(ctx, run)).To(Succeed())
 				if latest == nil || run.CreationTimestamp.After(latest.CreationTimestamp.Time) {
 					latest = run

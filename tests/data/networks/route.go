@@ -74,6 +74,16 @@ type RouteSpec struct {
 	// Determines which ingress controller handles the route.
 	// e.g. kubernetes.io/container-runtime (Kourier for Knative, nginx for standard)
 	Runtime RouteRuntime `json:"runtime"`
+
+	// The ServiceUnit, in the same namespace, whose workload this route serves.
+	// Required by the engine: a Route without a workload binding is invalid.
+	ServiceUnitRef ServiceUnitRef `json:"serviceUnitRef"`
+}
+
+// ServiceUnitRef names the ServiceUnit a Route serves.
+type ServiceUnitRef struct {
+	// Name of the ServiceUnit in the Route's namespace.
+	Name string `json:"name"`
 }
 
 // RouteRuntime is the serving runtime backend for a Route.
@@ -155,11 +165,12 @@ func NewRouteData(name, namespace, host, envName string) *RouteData {
 			},
 		},
 		Spec: RouteSpec{
-			Host:       host,
-			Path:       "/",
-			Enabled:    true,
-			TLSEnabled: true,
-			Runtime:    RouteRuntimeKubernetes,
+			Host:           host,
+			Path:           "/",
+			Enabled:        true,
+			TLSEnabled:     true,
+			Runtime:        RouteRuntimeKubernetes,
+			ServiceUnitRef: ServiceUnitRef{Name: name},
 		},
 	}
 }

@@ -26,8 +26,8 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: fmt vet ## Run tests that don't require a live cluster (tests/fake needs one — see run-tests.yml).
-	go test $$(go list ./... | grep -v /tests/fake) -coverprofile cover.out
+test: fmt vet ## Run tests that don't require a live cluster (tests/fake and tests/grpc need one — see run-tests.yml).
+	go test ./tests/data/... -coverprofile cover.out
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter
@@ -57,7 +57,7 @@ GOLANGCI_LINT = $(LOCALBIN)/golangci-lint
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
 CONTROLLER_TOOLS_VERSION ?= v0.20.1
-GOLANGCI_LINT_VERSION ?= v2.8.0
+GOLANGCI_LINT_VERSION ?= v2.14.0
 
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.

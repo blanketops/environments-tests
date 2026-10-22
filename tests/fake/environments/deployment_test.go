@@ -116,7 +116,7 @@ func deploymentFromData(d *testdata.DeploymentData) *environmentsv1alpha1.Deploy
 var _ = Describe("Deployment Controller", func() {
 	ctx := context.Background()
 
-	const testNamespace = "default"
+	const testNamespace = defaultNamespace
 
 	// BASIC BEHAVIOUR
 
@@ -405,7 +405,7 @@ var _ = Describe("Deployment Controller", func() {
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "does-not-exist",
+					Name:      missingName,
 					Namespace: testNamespace,
 				},
 			})

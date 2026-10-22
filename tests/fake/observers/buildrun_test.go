@@ -69,7 +69,7 @@ var _ = Describe("BuildRun Observer", func() {
 	}
 
 	It("does nothing for a non-terminal BuildRun", func() {
-		run := buildRunFixture(buildName+"-run-pending", testNamespace, buildName)
+		run := buildRunFixture(buildName+"-run-pending", buildName)
 		Expect(k8sClient.Create(ctx, run)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, run) }()
 
@@ -81,7 +81,7 @@ var _ = Describe("BuildRun Observer", func() {
 	})
 
 	It("writes BuildSuccess when the BuildRun's Succeeded condition is True", func() {
-		run := buildRunFixture(buildName+"-run-ok", testNamespace, buildName)
+		run := buildRunFixture(buildName+"-run-ok", buildName)
 		Expect(k8sClient.Create(ctx, run)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, run) }()
 
@@ -113,7 +113,7 @@ var _ = Describe("BuildRun Observer", func() {
 	})
 
 	It("writes BuildFailed when the BuildRun's Succeeded condition is False", func() {
-		run := buildRunFixture(buildName+"-run-fail", testNamespace, buildName)
+		run := buildRunFixture(buildName+"-run-fail", buildName)
 		Expect(k8sClient.Create(ctx, run)).To(Succeed())
 		defer func() { _ = k8sClient.Delete(ctx, run) }()
 

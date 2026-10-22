@@ -122,7 +122,7 @@ func packageFromData(d *testdata.PackageData) *environmentsv1.Package {
 var _ = Describe("Package Controller", func() {
 	ctx := context.Background()
 
-	const testNamespace = "default"
+	const testNamespace = defaultNamespace
 
 	// -------------------------------------------------------------------------
 	// BASIC BEHAVIOUR
@@ -151,12 +151,21 @@ var _ = Describe("Package Controller", func() {
 			pkg := &environmentsv1.Package{}
 			if err := k8sClient.Get(ctx, key, pkg); err == nil {
 				_ = k8sClient.Delete(ctx, pkg)
+				// The real reconciler's finalizer gate runs regardless of which
+				// domain is injected — nothing else is watching this cluster
+				// during these tests, so drive the delete path once more here
+				// or the object is stuck in Terminating forever.
+				_, _ = newPackageReconciler(&FakePackageDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			}
 		})
 
 		It("routes the Package update through the engine to the Package domain", func() {
 			domain := &FakePackageDomain{}
 			reconciler := newPackageReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -189,6 +198,10 @@ var _ = Describe("Package Controller", func() {
 				Err: fmt.Errorf("package domain failure"),
 			}
 			reconciler := newPackageReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -223,21 +236,30 @@ var _ = Describe("Package Controller", func() {
 				}
 
 				d := testdata.NewPackageData(tc.name, testNamespace, "for-kaniko-app")
-				d.Spec.Contract.StateRepo.Strategy = tc.strategy
-				d.Spec.Contract.PackageKappDiff = tc.kappDiff
-				d.Spec.Contract.StateRepo.Ref.Branch = tc.stateBranch
-				d.Spec.Contract.StateRepo.Path = tc.statePath
+				d.Spec.Contract.StateRepository.Strategy = tc.strategy
+				d.Spec.Contract.DiffEnabled = tc.kappDiff
+				d.Spec.Contract.StateRepository.Ref = tc.stateBranch
+				d.Spec.Contract.StateRepository.Path = tc.statePath
 
 				Expect(k8sClient.Create(ctx, packageFromData(d))).To(Succeed())
 				DeferCleanup(func() {
 					pkg := &environmentsv1.Package{}
 					if err := k8sClient.Get(ctx, key, pkg); err == nil {
 						_ = k8sClient.Delete(ctx, pkg)
+						// The real reconciler's finalizer gate runs regardless of which
+						// domain is injected — nothing else is watching this cluster
+						// during these tests, so drive the delete path once more here
+						// or the object is stuck in Terminating forever.
+						_, _ = newPackageReconciler(&FakePackageDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 					}
 				})
 
 				domain := &FakePackageDomain{}
 				reconciler := newPackageReconciler(domain)
+
+				// First reconcile on a brand-new object only adds the finalizer
+				// and returns — the domain isn't invoked until the next pass.
+				_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 				_, err := reconciler.Reconcile(ctx, reconcile.Request{
 					NamespacedName: key,
@@ -255,30 +277,30 @@ var _ = Describe("Package Controller", func() {
 
 				var contract testdata.PackageContract
 				Expect(json.Unmarshal(pkgObj.Spec.Contract.Raw, &contract)).To(Succeed())
-				Expect(contract.StateRepo.Strategy).To(Equal(tc.strategy))
-				Expect(contract.PackageKappDiff).To(Equal(tc.kappDiff))
-				Expect(contract.StateRepo.Ref.Branch).To(Equal(tc.stateBranch))
-				Expect(contract.StateRepo.Path).To(Equal(tc.statePath))
-				Expect(contract.PackageRepository.CredentialsSecret).To(Equal("git-ssh-credentials-packages"))
+				Expect(contract.StateRepository.Strategy).To(Equal(tc.strategy))
+				Expect(contract.DiffEnabled).To(Equal(tc.kappDiff))
+				Expect(contract.StateRepository.Ref).To(Equal(tc.stateBranch))
+				Expect(contract.StateRepository.Path).To(Equal(tc.statePath))
+				Expect(contract.Repository.CredentialsSecret).To(Equal("git-ssh-credentials-packages"))
 			},
 
 			Entry("kustomization — kapp-diff enabled", packageTestCase{
 				name:        "pkg-kustomize-diff",
-				strategy:    "kustomization",
+				strategy:    strategyKustomization,
 				kappDiff:    true,
 				stateBranch: "master",
 				statePath:   "./clusters/dev",
 			}),
 			Entry("kustomization — kapp-diff disabled", packageTestCase{
 				name:        "pkg-kustomize-no-diff",
-				strategy:    "kustomization",
+				strategy:    strategyKustomization,
 				kappDiff:    false,
 				stateBranch: "master",
 				statePath:   "./clusters/dev",
 			}),
 			Entry("kustomization — staging branch", packageTestCase{
 				name:        "pkg-kustomize-staging",
-				strategy:    "kustomization",
+				strategy:    strategyKustomization,
 				kappDiff:    true,
 				stateBranch: "main",
 				statePath:   "./clusters/staging",
@@ -301,11 +323,20 @@ var _ = Describe("Package Controller", func() {
 				pkg := &environmentsv1.Package{}
 				if err := k8sClient.Get(ctx, key, pkg); err == nil {
 					_ = k8sClient.Delete(ctx, pkg)
+					// The real reconciler's finalizer gate runs regardless of which
+					// domain is injected — nothing else is watching this cluster
+					// during these tests, so drive the delete path once more here
+					// or the object is stuck in Terminating forever.
+					_, _ = newPackageReconciler(&FakePackageDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				}
 			})
 
 			domain := &FakePackageDomain{}
 			reconciler := newPackageReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -339,11 +370,20 @@ var _ = Describe("Package Controller", func() {
 				pkg := &environmentsv1.Package{}
 				if err := k8sClient.Get(ctx, key, pkg); err == nil {
 					_ = k8sClient.Delete(ctx, pkg)
+					// The real reconciler's finalizer gate runs regardless of which
+					// domain is injected — nothing else is watching this cluster
+					// during these tests, so drive the delete path once more here
+					// or the object is stuck in Terminating forever.
+					_, _ = newPackageReconciler(&FakePackageDomain{}).Reconcile(ctx, reconcile.Request{NamespacedName: key})
 				}
 			})
 
 			domain := &FakePackageDomain{}
 			reconciler := newPackageReconciler(domain)
+
+			// First reconcile on a brand-new object only adds the finalizer
+			// and returns — the domain isn't invoked until the next pass.
+			_, _ = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: key,
@@ -356,10 +396,10 @@ var _ = Describe("Package Controller", func() {
 
 			var contract testdata.PackageContract
 			Expect(json.Unmarshal(pkgObj.Spec.Contract.Raw, &contract)).To(Succeed())
-			Expect(contract.PackageMaintainers).To(HaveLen(1))
-			Expect(contract.PackageMaintainers[0].Name).To(Equal("Neo"))
-			Expect(contract.PackageMaintainers[0].Email).To(Equal("neo@blanketops.online"))
-			Expect(contract.PackageVersion).To(Equal("v1.2.3"))
+			Expect(contract.Maintainers).To(HaveLen(1))
+			Expect(contract.Maintainers[0].Name).To(Equal("Neo"))
+			Expect(contract.Maintainers[0].Email).To(Equal("neo@blanketops.online"))
+			Expect(contract.Version).To(Equal("v1.2.3"))
 		})
 	})
 
@@ -374,7 +414,7 @@ var _ = Describe("Package Controller", func() {
 
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      "does-not-exist",
+					Name:      missingName,
 					Namespace: testNamespace,
 				},
 			})

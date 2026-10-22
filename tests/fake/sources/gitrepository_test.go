@@ -147,7 +147,7 @@ var _ = Describe("GitRepository Controller", func() {
 			if err := k8sClient.Get(ctx, key, gr); errors.IsNotFound(err) {
 				Expect(
 					k8sClient.Create(ctx, gitRepositoryFromData(
-						testdata.NewGitRepositoryData(name, "for-kaniko-app"),
+						testdata.NewGitRepositoryData(name, testEnvName),
 					)),
 				).To(Succeed())
 			}
@@ -289,7 +289,7 @@ var _ = Describe("GitRepository Controller", func() {
 			// Matches real CR: for-kaniko-app — push + pull_request
 			Entry("push and pull_request — cloudflared tunnel", gitRepositoryTestCase{
 				name:     "gr-push-pr",
-				repoName: "for-kaniko-app",
+				repoName: testEnvName,
 				hookURL:  "https://elimination-propecia-meter-strips.trycloudflare.com/",
 				webhookEvents: []testdata.WebhookEvent{
 					testdata.WebhookEventPush,
@@ -298,7 +298,7 @@ var _ = Describe("GitRepository Controller", func() {
 			}),
 			Entry("push only — cloudflared tunnel", gitRepositoryTestCase{
 				name:     "gr-push-only",
-				repoName: "for-kaniko-app",
+				repoName: testEnvName,
 				hookURL:  "https://elimination-propecia-meter-strips.trycloudflare.com/",
 				webhookEvents: []testdata.WebhookEvent{
 					testdata.WebhookEventPush,
@@ -306,7 +306,7 @@ var _ = Describe("GitRepository Controller", func() {
 			}),
 			Entry("push and pull_request — production ingress URL", gitRepositoryTestCase{
 				name:     "gr-prod-ingress",
-				repoName: "for-kaniko-app",
+				repoName: testEnvName,
 				hookURL:  "https://events.blanketops.dev/webhooks/github",
 				webhookEvents: []testdata.WebhookEvent{
 					testdata.WebhookEventPush,
@@ -323,7 +323,7 @@ var _ = Describe("GitRepository Controller", func() {
 			const name = "gr-repo-identity"
 			key := types.NamespacedName{Name: name, Namespace: testNamespace}
 
-			d := testdata.NewGitRepositoryData("for-kaniko-app", "for-kaniko-app")
+			d := testdata.NewGitRepositoryData(testEnvName, testEnvName)
 			d.Name = name
 			Expect(k8sClient.Create(ctx, gitRepositoryFromData(d))).To(Succeed())
 			DeferCleanup(func() {
@@ -354,7 +354,7 @@ var _ = Describe("GitRepository Controller", func() {
 			var contract testdata.GitRepositoryContract
 			Expect(json.Unmarshal(grObj.Spec.Contract.Raw, &contract)).To(Succeed())
 			Expect(contract.Repository.Owner).To(Equal("ntlaletsi70"))
-			Expect(contract.Repository.Name).To(Equal("for-kaniko-app"))
+			Expect(contract.Repository.Name).To(Equal(testEnvName))
 		})
 	})
 
