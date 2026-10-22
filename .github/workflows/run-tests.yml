@@ -17,9 +17,13 @@ on:
         required: false
         default: ""
 
-# The environments-install release whose CRDs the tests run against.
+# The environments-install release whose CRDs the tests run against, and
+# the test-helper (blanketops/environments-bots) that keeps one issue per
+# test file and posts each run's results to it. test-helper is not released
+# yet, so it is pinned to a commit; switch to a release tag once there is one.
 env:
   ENVIRONMENTS_INSTALL_REF: v0.2.6
+  TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
 
 jobs:
   test:
@@ -28,6 +32,11 @@ jobs:
     permissions:
       contents: read
       checks: write
+      # test-helper opens the tracking issues and comments the results with
+      # this job's GITHUB_TOKEN. The BlanketOps-Environments App has no
+      # Issues permission yet; with it, test-helper could also put new
+      # issues on the project board (-project blanketops/1).
+      issues: write
 
     steps:
     - name: Clone the code
@@ -47,6 +56,25 @@ jobs:
     # re-resolves the module graph and can pull in untested versions.
     - name: Download modules
       run: go mod download
+
+    - name: Install test-helper
+      id: test-helper
+      continue-on-error: true
+      run: |
+        GOBIN="${RUNNER_TEMP}/bin" go install "github.com/blanketops/environments-bots/cmd/test-helper@${TEST_HELPER_REF}"
+        echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+    # One issue per test file under tests/ (tests/data excluded), opened
+    # here so a pull request that adds a test file gets its issue before
+    # the first results are posted. Existing issues are left alone. Never
+    # fails the job: on a fork's pull request the token is read-only.
+    - name: Open issues for new test files
+      if: steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SOURCE: ${{ github.event.pull_request.html_url }}
+      run: test-helper sync -source "$SOURCE"
 
     # The runner pods have no Docker daemon, so kind cannot run here, and a
     # privileged Docker sidecar would give PR code root on the node. The
@@ -113,29 +141,61 @@ jobs:
         echo "test_run=$TEST_RUN"   >> "$GITHUB_OUTPUT"
         echo "Running: $TEST_PATH ${TEST_RUN:+-run $TEST_RUN}"
 
+    # Two go test calls into one reports/test-output.json: the Ginkgo
+    # suites also write a JSON report per package (ginkgo-report.json in
+    # the package directory), which maps every spec to its file for
+    # test-helper. The plain Go test packages (tests/grpc) reject the
+    # -ginkgo.* flag, so they run without it.
     - name: Run tests
       run: |
         TEST_PATH="${{ steps.resolve.outputs.test_path }}"
         TEST_RUN="${{ steps.resolve.outputs.test_run }}"
 
         mkdir -p reports
+        : > reports/test-output.json
 
-        RUN_FLAG=""
+        RUN_ARGS=()
         if [ -n "$TEST_RUN" ]; then
-          RUN_FLAG="-run $TEST_RUN"
+          RUN_ARGS=(-run "$TEST_RUN")
         fi
 
-        go test \
-          $TEST_PATH \
-          $RUN_FLAG \
-          -v \
-          -count=1 \
-          -timeout 10m \
-          -json \
-          2>&1 | tee reports/test-output.json
+        # shellcheck disable=SC2086 # TEST_PATH may list several patterns
+        GINKGO_PKGS=$(go list -f '{{.ImportPath}} {{join .TestImports " "}} {{join .XTestImports " "}}' $TEST_PATH \
+          | awk '/ github.com\/onsi\/ginkgo\/v2( |$)/ {print $1}')
+        # shellcheck disable=SC2086
+        OTHER_PKGS=$(go list $TEST_PATH | grep -vxF -e "${GINKGO_PKGS:-^}" || true)
 
-        # Exit code from go test — not tee
-        exit "${PIPESTATUS[0]}"
+        run_tests() {
+          go test "$@" "${RUN_ARGS[@]}" -v -count=1 -timeout 10m -json 2>&1 \
+            | tee -a reports/test-output.json
+          return "${PIPESTATUS[0]}"
+        }
+
+        status=0
+        if [ -n "$GINKGO_PKGS" ]; then
+          # shellcheck disable=SC2086 # one argument per package
+          run_tests $GINKGO_PKGS -ginkgo.json-report=ginkgo-report.json || status=1
+        fi
+        if [ -n "$OTHER_PKGS" ]; then
+          # shellcheck disable=SC2086
+          run_tests $OTHER_PKGS || status=1
+        fi
+        exit "$status"
+
+    # Comments each test file's results on its issue, with a link to this
+    # run. Runs whether the tests passed or failed; never fails the job.
+    - name: Post results to the test issues
+      if: always() && steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REF: "${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }}"
+      run: |
+        args=()
+        while IFS= read -r report; do
+          args+=(-ginkgo-json "$report")
+        done < <(find tests -name ginkgo-report.json)
+        test-helper report -go-json reports/test-output.json "${args[@]}" -ref "$REF"
 
     - name: Convert to JUnit XML
       if: always()
