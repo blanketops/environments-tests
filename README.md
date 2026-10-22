@@ -102,13 +102,28 @@ suite is fully self-contained and deterministic.
 
 ## CI
 
-Two workflows run on `ubuntu-latest` GitHub-hosted runners:
+The workflows run on the repository's self-hosted runner (`runs-on:
+self-hosted`), on pull requests and on pushes to `test` and `master`:
 
-* **`run-tests.yml`** — full suite on push/PR. Emits JUnit XML via
-  `go-junit-report`, surfaced as a check through `dorny/test-reporter`.
-* **`create-test.yml`** — on every PR merged into `main`, files a tracking
-  issue for each test file that PR touched (not a full-tree rescan). Also
-  runnable via `workflow_dispatch` for a one-off full scan.
+| Workflow | Check | What it runs |
+|---|---|---|
+| Lint (`lint.yml`) | golangci-lint | The runner image's golangci-lint over the whole module |
+| Data Tests (`test.yml`) | Fixtures and conformance (tests/data) | `make test`: the fixture builders and engine conformance tests, no cluster |
+| Suite Tests (`run-tests.yml`) | fake and gRPC suites (envtest) | `tests/fake` and `tests/grpc` against an envtest API server with the CRDs from environments-install; JUnit and Allure reports as artifacts, and a results table in the job summary |
+
+Each test file has a tracking issue, `[test] <path under tests/>` (e.g.
+`[test] fake/networks/route_test`), labelled `test-tracking` and its layer.
+A test file is a `*_test.go` file under `tests/` (`tests/data` excluded)
+that declares Go test functions or top-level Ginkgo containers. Suite Tests
+runs test-helper (blanketops/environments-bots) as the BlanketOps
+Environments Tests App (`blanketops-environments-tests[bot]`; secrets
+`TESTS_APP_ID` and `TESTS_APP_PRIVATE_KEY`, falling back to the job's
+`GITHUB_TOKEN` where they are not available): before the tests, `test-helper
+sync` opens issues for new test files, including those a pull request adds,
+and puts them on project 1 in Test; after them, `test-helper
+report` comments every file's results on its issue (each test's result
+and time, failure and skip output, a link to the run). Neither step can fail
+the job.
 
 ## Conventions
 
