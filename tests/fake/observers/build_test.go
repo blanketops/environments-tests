@@ -42,7 +42,7 @@ import (
 )
 
 // buildToAPI converts a testdata.BuildData into the real Build API type,
-// same conversion point pattern as tests/fake/environments/build.go.
+// same conversion point pattern as tests/fake/environments/build_test.go.
 func buildToAPI(d *buildtestdata.BuildData) *environmentsv1alpha1.Build {
 	raw, err := json.Marshal(d.Spec)
 	if err != nil {
@@ -58,7 +58,7 @@ func buildToAPI(d *buildtestdata.BuildData) *environmentsv1alpha1.Build {
 
 // githubEventToAPI converts a testdata.GitHubEventData into the real
 // GitHubEvent API type. Same conversion point pattern as
-// tests/fake/events/githubevent.go's gitHubEventFromData.
+// tests/fake/events/githubevent_test.go's gitHubEventFromData.
 func githubEventToAPI(d *eventtestdata.GitHubEventData) *eventsv1alpha1.GitHubEvent {
 	raw, err := json.Marshal(d.Spec.Contract)
 	if err != nil {
