@@ -102,13 +102,18 @@ suite is fully self-contained and deterministic.
 
 ## CI
 
-Two workflows run on `ubuntu-latest` GitHub-hosted runners:
+The workflows run on the repository's self-hosted runner (`runs-on:
+self-hosted`), on pull requests and on pushes to `test` and `master`:
 
-* **`run-tests.yml`** — full suite on push/PR. Emits JUnit XML via
-  `go-junit-report`, surfaced as a check through `dorny/test-reporter`.
-* **`create-test.yml`** — on every PR merged into `main`, files a tracking
-  issue for each test file that PR touched (not a full-tree rescan). Also
-  runnable via `workflow_dispatch` for a one-off full scan.
+| Workflow | Check | What it runs |
+|---|---|---|
+| Lint (`lint.yml`) | golangci-lint | The runner image's golangci-lint over the whole module |
+| Data Tests (`test.yml`) | Fixtures and conformance (tests/data) | `make test`: the fixture builders and engine conformance tests, no cluster |
+| Suite Tests (`run-tests.yml`) | fake and gRPC suites (envtest) | `tests/fake` and `tests/grpc` against an envtest API server with the CRDs from environments-install; JUnit and Allure reports as artifacts, and a results table in the job summary |
+
+`create-test.yml` still opens a tracking issue per test file, but only on
+merges into `main`, a branch this repository does not have, so it never
+fires. test-helper (blanketops/environments-bots) replaces it.
 
 ## Conventions
 

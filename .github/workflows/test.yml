@@ -1,12 +1,18 @@
-name: Tests
+# tests/data only: fixture builders and engine conformance tests, which need
+# no cluster. The suites under tests/fake and tests/grpc run in run-tests.yml.
+name: Data Tests
 
+# Pushes run only on the long-lived branches; work branches run through their
+# pull request. With both triggers on every branch, each check ran twice on a
+# pull request and queued twice on the repository's single runner.
 on:
   push:
+    branches: [test, master]
   pull_request:
 
 jobs:
   test:
-    name: Run on ubuntu-latest
+    name: Fixtures and conformance (tests/data)
     runs-on: self-hosted
     steps:
       - name: Clone the code
