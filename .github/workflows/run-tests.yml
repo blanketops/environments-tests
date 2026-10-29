@@ -24,6 +24,9 @@ on:
 env:
   ENVIRONMENTS_INSTALL_REF: v0.2.6
   TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
+  ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+  ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+  ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
 
 jobs:
   test:
@@ -212,6 +215,16 @@ jobs:
         done < <(find tests -name ginkgo-report.json)
         test-helper report -go-json reports/test-output.json "${args[@]}" -ref "$REF"
 
+    - name: Send test results to Allure
+      if: always() && env.ALLURE_SERVER_URL != ''
+      continue-on-error: true
+      env:
+        ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+        ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+        ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+      run: |
+        cat reports/test-output.json | bops-env report --type test --run-id "${{ github.run_number }}"
+
     - name: Convert to JUnit XML
       if: always()
       run: |
@@ -221,77 +234,6 @@ jobs:
           | go-junit-report -parser gojson \
           > reports/junit.xml
         echo "JUnit report written to reports/junit.xml"
-
-    - name: Upload test report
-      if: always()
-      uses: actions/upload-artifact@v4
-      continue-on-error: true
-      with:
-        name: test-report-${{ github.run_number }}
-        path: reports/
-        retention-days: 15
-
-    # The Allure steps only build a report, so they do not fail the job; the
-    # test result above is what passes or fails it. Java and the Allure CLI
-    # come from the runner image (zenith-runner-toolchain 1.0.13 and later).
-    - name: Allure version
-      if: always()
-      continue-on-error: true
-      run: allure --version
-
-    - name: Restore Allure history
-      if: always()
-      uses: actions/cache@v4
-      with:
-        path: allure-history
-        key: allure-history-${{ github.run_id }}
-        restore-keys: |
-          allure-history-
-
-    - name: Seed Allure history
-      if: always()
-      run: |
-        mkdir -p reports/history
-        if [ -d allure-history/history ]; then
-          cp -r allure-history/history/. reports/history/
-        fi
-
-    - name: Generate Allure report
-      if: always()
-      continue-on-error: true
-      run: |
-        # Allure2 auto-detects JUnit XML in the input directory — no native
-        # allure-results needed for a go test / go-junit-report pipeline.
-        # reports/history (seeded above) is what makes the trend widgets
-        # (duration/history/retry/categories-trend) build up over runs
-        # instead of resetting every time.
-        allure generate reports/ -o allure-report --clean
-
-    - name: Persist Allure history
-      if: always()
-      continue-on-error: true
-      run: |
-        mkdir -p allure-history
-        rm -rf allure-history/history
-        cp -r allure-report/history allure-history/history
-
-    - name: Upload Allure report
-      if: always()
-      uses: actions/upload-artifact@v4
-      continue-on-error: true
-      with:
-        name: allure-report-${{ github.run_number }}
-        path: allure-report/
-        retention-days: 15
-
-    - name: Publish test results
-      if: always()
-      uses: dorny/test-reporter@v1
-      with:
-        name: "Test Results"
-        path: reports/junit.xml
-        reporter: java-junit
-        fail-on-error: false
 
     - name: Summary
       if: always()
