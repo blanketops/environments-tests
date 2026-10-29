@@ -20,7 +20,7 @@ func TestExternalSecretReconcileProfile(t *testing.T) {
 	defer runtime.SetCPUProfileRate(0)
 
 	start := time.Now()
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		_ = ctx.Done()
 	}
 	t.Logf("Reconciled 100 ExternalSecrets in %v", time.Since(start))
@@ -38,7 +38,7 @@ func TestSecretSyncProfile(t *testing.T) {
 	var m1, m2 runtime.MemStats
 	runtime.ReadMemStats(&m1)
 
-	for i := 0; i < 500; i++ {
+	for range 500 {
 		_ = ctx.Done()
 	}
 
@@ -60,7 +60,7 @@ func TestClusterSecretStoreValidationProfile(t *testing.T) {
 	defer runtime.SetCPUProfileRate(0)
 
 	start := time.Now()
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		_ = ctx.Done()
 	}
 	t.Logf("Validated 100 ClusterSecretStores in %v", time.Since(start))

@@ -16,6 +16,7 @@ const (
 	readyPath  = "/ready"
 	livePath   = "/live"
 	probePort  = 8080
+	probeKey   = "path"
 )
 
 // BenchmarkDeploymentCRDCreation benchmarks the creation of Deployment CRs.
@@ -54,9 +55,9 @@ func BenchmarkDeploymentScaling(b *testing.B) {
 // BenchmarkDeploymentHealthCheck benchmarks health probe evaluation.
 func BenchmarkDeploymentHealthCheck(b *testing.B) {
 	probes := []map[string]any{
-		{"path": healthPath, "port": probePort},
-		{"path": readyPath, "port": probePort},
-		{"path": livePath, "port": probePort},
+		{probeKey: healthPath, "port": probePort},
+		{probeKey: readyPath, "port": probePort},
+		{probeKey: livePath, "port": probePort},
 	}
 
 	b.ResetTimer()

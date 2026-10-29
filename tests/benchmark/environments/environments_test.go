@@ -11,11 +11,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	contractRawJSON = `{"secretStore":{"provider":"vault"},"build":{"strategy":"kaniko"}}`
+)
+
 // BenchmarkEnvironmentCRDCreation benchmarks the creation of Environment CRs.
 func BenchmarkEnvironmentCRDCreation(b *testing.B) {
 	_ = scheme.AddToScheme(scheme.Scheme)
 
-	contractRaw := []byte(`{"secretStore":{"provider":"vault"},"build":{"strategy":"kaniko"}}`)
+	contractRaw := []byte(contractRawJSON)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -25,9 +29,9 @@ func BenchmarkEnvironmentCRDCreation(b *testing.B) {
 
 // BenchmarkEnvironmentResolution benchmarks contract resolution.
 func BenchmarkEnvironmentResolution(b *testing.B) {
-	raw := []byte(`{"secretStore":{"provider":"vault"},"build":{"strategy":"kaniko"}}`)
+	raw := []byte(contractRawJSON)
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = json.Unmarshal(raw, &parsed)
@@ -64,7 +68,7 @@ func BenchmarkSecretSync(b *testing.B) {
 
 // BenchmarkClusterSecretStoreValidation benchmarks ClusterSecretStore validation.
 func BenchmarkClusterSecretStoreValidation(b *testing.B) {
-	store := map[string]interface{}{
+	store := map[string]any{
 		"provider": "vault",
 		"server":   "http://vault:8200",
 		"path":     "secret",
@@ -79,7 +83,7 @@ func BenchmarkClusterSecretStoreValidation(b *testing.B) {
 
 // BenchmarkJSONMarshaling benchmarks JSON marshaling/unmarshaling of contract specs.
 func BenchmarkJSONMarshaling(b *testing.B) {
-	spec := map[string]interface{}{
+	spec := map[string]any{
 		"secretStore": map[string]string{"provider": "vault"},
 		"build":       map[string]string{"strategy": "kaniko"},
 		"deployment":  map[string]string{"replicas": "3"},
@@ -89,7 +93,7 @@ func BenchmarkJSONMarshaling(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		data, _ := json.Marshal(spec)
-		var out map[string]interface{}
+		var out map[string]any
 		_ = json.Unmarshal(data, &out)
 	}
 }
