@@ -66,15 +66,6 @@ jobs:
                   GOBIN="${RUNNER_TEMP}/bin" go install "github.com/blanketops/environments-bots/cmd/test-helper@${TEST_HELPER_REF}"
                   echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
 
-            # One issue per test file under tests/ (tests/data excluded), opened
-            # here so a pull request that adds a test file gets its issue before
-            # the first results are posted. Existing issues are left alone. Never
-            # fails the job: on a fork's pull request the token is read-only.
-            # test-helper acts as the BlanketOps Environments Tests App
-            # (blanketops-environments-tests[bot]): Issues read and write, and
-            # organization Projects read and write, so new issues also go on the
-            # project board. Runs without the secrets (forks, Dependabot) fall back
-            # to this job's GITHUB_TOKEN, which can write issues but not the board.
             - name: Mint the test bot's token
               id: bot-token
               if: steps.test-helper.outcome == 'success'
@@ -85,15 +76,6 @@ jobs:
                   private-key: ${{ secrets.TESTS_APP_PRIVATE_KEY }}
                   owner: blanketops
                   repositories: environments-tests
-
-            - name: Open issues for new test files
-              if: steps.test-helper.outcome == 'success'
-              continue-on-error: true
-              env:
-                  GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
-                  PROJECT: ${{ steps.bot-token.outputs.token && 'blanketops/1' || '' }}
-                  SOURCE: ${{ github.event.pull_request.html_url }}
-              run: test-helper sync -source "$SOURCE" ${PROJECT:+-project "$PROJECT"}
 
             # The runner pods have no Docker daemon, so kind cannot run here, and a
             # privileged Docker sidecar would give PR code root on the node. The
