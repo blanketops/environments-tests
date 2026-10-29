@@ -85,8 +85,8 @@ func BenchmarkGitStateRepositorySync(b *testing.B) {
 // BenchmarkGitJSONMarshaling benchmarks JSON marshaling of git specs.
 func BenchmarkGitJSONMarshaling(b *testing.B) {
 	spec := map[string]any{
-		"repository":  "github.com/org/repo",
-		"revision":    "main",
+		"repository": "github.com/org/repo",
+		"revision":   "main",
 		"auth": map[string]string{
 			"type": "ssh",
 		},

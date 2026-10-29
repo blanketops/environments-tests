@@ -73,10 +73,10 @@ step 3: pushing image... done`)
 
 // BenchmarkBuildJSONMarshaling benchmarks JSON marshaling of build specs.
 func BenchmarkBuildJSONMarshaling(b *testing.B) {
-	spec := map[string]interface{}{
+	spec := map[string]any{
 		"strategy": "kaniko",
 		"source": map[string]string{
-			"git":     "github.com/org/repo",
+			"git":      "github.com/org/repo",
 			"revision": "main",
 		},
 		"output": map[string]string{
@@ -87,7 +87,7 @@ func BenchmarkBuildJSONMarshaling(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		data, _ := json.Marshal(spec)
-		var out map[string]interface{}
+		var out map[string]any
 		_ = json.Unmarshal(data, &out)
 	}
 }
