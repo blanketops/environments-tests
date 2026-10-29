@@ -11,11 +11,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	esSpecJSON = `{"secretStoreRef":{"name":"vault-store","kind":"ClusterSecretStore"},` +
+		`"target":{"name":"git-ssh"},` +
+		`"data":[{"secretKey":"ssh-privatekey","remoteRef":{"key":"blanketops/environments/git/ssh-privatekey"}}]}`
+)
+
 // BenchmarkExternalSecretCreation benchmarks ExternalSecret CR creation.
 func BenchmarkExternalSecretCreation(b *testing.B) {
 	_ = scheme.AddToScheme(scheme.Scheme)
 
-	esSpec := []byte(`{"secretStoreRef":{"name":"vault-store","kind":"ClusterSecretStore"},"target":{"name":"git-ssh"},"data":[{"secretKey":"ssh-privatekey","remoteRef":{"key":"blanketops/environments/git/ssh-privatekey"}}]}`)
+	esSpec := []byte(esSpecJSON)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -71,7 +77,7 @@ func BenchmarkClusterSecretStoreReconcile(b *testing.B) {
 
 // BenchmarkSecretJSONMarshaling benchmarks JSON marshaling of secret specs.
 func BenchmarkSecretJSONMarshaling(b *testing.B) {
-	spec := map[string]interface{}{
+	spec := map[string]any{
 		"secretStoreRef": map[string]string{
 			"name": "vault-store",
 			"kind": "ClusterSecretStore",
@@ -79,7 +85,7 @@ func BenchmarkSecretJSONMarshaling(b *testing.B) {
 		"target": map[string]string{
 			"name": "git-ssh",
 		},
-		"data": []map[string]interface{}{
+		"data": []map[string]any{
 			{
 				"secretKey": "ssh-privatekey",
 				"remoteRef": map[string]string{
@@ -92,7 +98,7 @@ func BenchmarkSecretJSONMarshaling(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		data, _ := json.Marshal(spec)
-		var out map[string]interface{}
+		var out map[string]any
 		_ = json.Unmarshal(data, &out)
 	}
 }

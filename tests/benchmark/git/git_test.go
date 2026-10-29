@@ -11,11 +11,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	sshSpecJSON = `{"secretStoreRef":{"name":"vault-store","kind":"ClusterSecretStore"},` +
+		`"target":{"name":"git-ssh"},` +
+		`"data":[` +
+		`{"secretKey":"ssh-privatekey","remoteRef":{"key":"blanketops/environments/git/ssh-privatekey"}},` +
+		`{"secretKey":"ssh-publickey","remoteRef":{"key":"blanketops/environments/git/ssh-publickey"}},` +
+		`{"secretKey":"known-hosts","remoteRef":{"key":"blanketops/environments/git/known-hosts"}}` +
+		`]}`
+)
+
 // BenchmarkGitSSHSecretCreation benchmarks Git SSH secret creation.
 func BenchmarkGitSSHSecretCreation(b *testing.B) {
 	_ = scheme.AddToScheme(scheme.Scheme)
 
-	sshSpec := []byte(`{"secretStoreRef":{"name":"vault-store","kind":"ClusterSecretStore"},"target":{"name":"git-ssh"},"data":[{"secretKey":"ssh-privatekey","remoteRef":{"key":"blanketops/environments/git/ssh-privatekey"}},{"secretKey":"ssh-publickey","remoteRef":{"key":"blanketops/environments/git/ssh-publickey"}},{"secretKey":"known-hosts","remoteRef":{"key":"blanketops/environments/git/known-hosts"}}]}`)
+	sshSpec := []byte(sshSpecJSON)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -74,7 +84,7 @@ func BenchmarkGitStateRepositorySync(b *testing.B) {
 
 // BenchmarkGitJSONMarshaling benchmarks JSON marshaling of git specs.
 func BenchmarkGitJSONMarshaling(b *testing.B) {
-	spec := map[string]interface{}{
+	spec := map[string]any{
 		"repository":  "github.com/org/repo",
 		"revision":    "main",
 		"auth": map[string]string{
@@ -87,7 +97,7 @@ func BenchmarkGitJSONMarshaling(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		data, _ := json.Marshal(spec)
-		var out map[string]interface{}
+		var out map[string]any
 		_ = json.Unmarshal(data, &out)
 	}
 }

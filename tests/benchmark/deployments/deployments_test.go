@@ -11,6 +11,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	healthPath = "/health"
+	readyPath  = "/ready"
+	livePath   = "/live"
+	probePort  = 8080
+)
+
 // BenchmarkDeploymentCRDCreation benchmarks the creation of Deployment CRs.
 func BenchmarkDeploymentCRDCreation(b *testing.B) {
 	_ = scheme.AddToScheme(scheme.Scheme)
@@ -46,10 +53,10 @@ func BenchmarkDeploymentScaling(b *testing.B) {
 
 // BenchmarkDeploymentHealthCheck benchmarks health probe evaluation.
 func BenchmarkDeploymentHealthCheck(b *testing.B) {
-	probes := []map[string]interface{}{
-		{"path": "/health", "port": 8080},
-		{"path": "/ready", "port": 8080},
-		{"path": "/live", "port": 8080},
+	probes := []map[string]any{
+		{"path": healthPath, "port": probePort},
+		{"path": readyPath, "port": probePort},
+		{"path": livePath, "port": probePort},
 	}
 
 	b.ResetTimer()
@@ -71,7 +78,7 @@ func BenchmarkDeploymentStatusUpdate(b *testing.B) {
 
 // BenchmarkDeploymentJSONMarshaling benchmarks JSON marshaling of deployment specs.
 func BenchmarkDeploymentJSONMarshaling(b *testing.B) {
-	spec := map[string]interface{}{
+	spec := map[string]any{
 		"replicas": 3,
 		"strategy": "rolling",
 		"image":    "registry.io/app:latest",
@@ -84,7 +91,7 @@ func BenchmarkDeploymentJSONMarshaling(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		data, _ := json.Marshal(spec)
-		var out map[string]interface{}
+		var out map[string]any
 		_ = json.Unmarshal(data, &out)
 	}
 }
