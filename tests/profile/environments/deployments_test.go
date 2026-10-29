@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package deployments contains CPU/memory profiling tests for Deployment CR reconciliation.
-package deployments
+// Package environments contains CPU/memory profiling tests for Deployment CR reconciliation.
+package environments
 
 import (
 	"context"

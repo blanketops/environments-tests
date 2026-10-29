@@ -13,8 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package git contains CPU/memory profiling tests for Git-related CR reconciliation.
-package git
+// Package sources contains CPU/memory profiling tests for GitRepository CR reconciliation.
+package sources
 
 import (
 	"context"
