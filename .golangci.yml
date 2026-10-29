@@ -49,6 +49,12 @@ linters:
       - staticcheck
       text: "ST1001:"
       path: tests/fake/*
+    - linters:
+      - dupl
+      path: tests/profile/*
+    - linters:
+      - dupl
+      path: tests/benchmark/*
     paths:
     - third_party$
     - builtin$
