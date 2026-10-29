@@ -141,7 +141,7 @@ jobs:
         GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
         REF: "Benchmark run #${{ github.run_number }}"
       run: |
-        test-helper report -go-json reports/benchmark-output.json -ref "$REF" -type benchmark
+        test-helper report -go-json reports/benchmark-output.json -ref "$REF"
 
     - name: Convert to JUnit XML
       if: always()
