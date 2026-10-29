@@ -1,1 +1,180 @@
+name: Scenario Tests
 
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Weekly on Sunday at 3 AM
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Scenario to run (full, upgrade, rollback, multi-env)"
+        required: false
+        default: "full"
+        type: choice
+        options:
+          - full
+          - upgrade
+          - rollback
+          - multi-env
+          - git-auth
+          - secret-rotation
+
+jobs:
+  scenario:
+    name: Scenario Tests
+    runs-on: self-hosted
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+
+    steps:
+    - name: Clone the code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        cache: false
+        go-version-file: go.mod
+
+    - name: Download modules
+      run: go mod download
+
+    - name: Install test-helper
+      id: test-helper
+      continue-on-error: true
+      run: |
+        GOBIN="${RUNNER_TEMP}/bin" go install "github.com/blanketops/environments-bots/cmd/test-helper@${TEST_HELPER_REF}"
+        echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+    - name: Mint the test bot's token
+      id: bot-token
+      if: steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ secrets.TESTS_APP_ID }}
+        private-key: ${{ secrets.TESTS_APP_PRIVATE_KEY }}
+        owner: blanketops
+        repositories: environments-tests
+
+    - name: Open issues for new test files
+      if: steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+        PROJECT: ${{ steps.bot-token.outputs.token && 'blanketops/1' || '' }}
+        SOURCE: ${{ github.event.workflow_dispatch.html_url || format('{0}/actions/runs/{1}', github.repository_url, github.run_id) }}
+      run: test-helper sync -source "$SOURCE" ${PROJECT:+-project "$PROJECT"}
+
+    - name: Start Kubernetes API (envtest)
+      run: |
+        envtest-up
+        kubectl version
+
+    - name: Checkout environments-install
+      uses: actions/checkout@v4
+      with:
+        repository: blanketops/environments-install
+        ref: ${{ env.ENVIRONMENTS_INSTALL_REF }}
+        path: environments-install
+
+    - name: Install CRDs
+      run: |
+        cd environments-install
+        mkdir -p bin
+        cp "$(command -v kustomize)" bin/kustomize
+        touch bin/kustomize
+        make install
+
+    - name: Install observer-layer CRDs
+      run: |
+        go mod download github.com/shipwright-io/build github.com/argoproj/argo-events
+        BUILDRUN_CRD="$(go list -m -f '{{.Dir}}' github.com/shipwright-io/build)/deploy/crds/shipwright.io_buildruns.yaml"
+        SENSOR_CRD="$(go list -m -f '{{.Dir}}' github.com/argoproj/argo-events)/manifests/base/crds/argoproj.io_sensors.yaml"
+        kubectl apply --server-side -f "$BUILDRUN_CRD"
+        kubectl apply -f "$SENSOR_CRD"
+        kubectl patch crd buildruns.shipwright.io --type merge -p '{"spec":{"conversion":{"strategy":"None","webhook":null}}}'
+
+    - name: Run scenario tests
+      run: |
+        SCENARIO="${{ github.event.inputs.scenario }}"
+        echo "Running scenario: $SCENARIO"
+
+        mkdir -p reports
+        : > reports/scenario-output.json
+
+        case "$SCENARIO" in
+          "full")
+            # Full integration test suite
+            go test ./tests/fake/... ./tests/grpc/... -v -count=1 -timeout 45m -json 2>&1 | tee -a reports/scenario-output.json
+            ;;
+          "upgrade")
+            # Test upgrade scenarios
+            go test ./tests/fake/environments/... -run "Upgrade" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
+            go test ./tests/fake/builds/... -run "Upgrade" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
+            ;;
+          "rollback")
+            # Test rollback scenarios
+            go test ./tests/fake/environments/... -run "Rollback" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
+            go test ./tests/fake/deployments/... -run "Rollback" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
+            ;;
+          "multi-env")
+            # Multi-environment tests
+            go test ./tests/fake/environments/... -run "Multi" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
+            ;;
+          "git-auth")
+            # Git authentication scenarios
+            go test ./tests/fake/git/... -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
+            go test ./tests/grpc/git/... -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
+            ;;
+          "secret-rotation")
+            # Secret rotation tests
+            go test ./tests/fake/secrets/... -run "Rotation" -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
+            go test ./tests/fake/secrets/... -run "Sync" -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
+            ;;
+          *)
+            echo "Unknown scenario: $SCENARIO"
+            exit 1
+            ;;
+        esac
+
+    - name: Post results to the test issues
+      if: always() && steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+        REF: "Scenario: ${{ github.event.inputs.scenario }} run #${{ github.run_number }}"
+      run: |
+        test-helper report -go-json reports/scenario-output.json -ref "$REF"
+
+    - name: Upload scenario report
+      if: always()
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      with:
+        name: scenario-report-${{ github.event.inputs.scenario }}-${{ github.run_number }}
+        path: reports/
+        retention-days: 30
+
+    - name: Summary
+      if: always()
+      run: |
+        PASS=$(jq -r 'select(.Action=="pass" and .Test!=null) | .Test' reports/scenario-output.json 2>/dev/null | sort -u | wc -l)
+        FAIL=$(jq -r 'select(.Action=="fail" and .Test!=null) | .Test' reports/scenario-output.json 2>/dev/null | sort -u | wc -l)
+        SKIP=$(jq -r 'select(.Action=="skip" and .Test!=null) | .Test' reports/scenario-output.json 2>/dev/null | sort -u | wc -l)
+
+        {
+          echo "### Scenario: ${{ github.event.inputs.scenario }} Results"
+          echo ""
+          echo "| Status | Count |"
+          echo "|--------|-------|"
+          echo "| ✅ Passed | $PASS |"
+          echo "| ❌ Failed | $FAIL |"
+          echo "| ⏭️ Skipped | $SKIP |"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+env:
+  ENVIRONMENTS_INSTALL_REF: v0.2.6
+  TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
