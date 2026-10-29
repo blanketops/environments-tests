@@ -1,1 +1,182 @@
+name: Regression Tests
 
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Daily at 1 AM
+  workflow_dispatch:
+    inputs:
+      test_path:
+        description: "Path to regression tests"
+        required: false
+        default: "./tests/..."
+
+jobs:
+  regression:
+    name: Regression Tests
+    runs-on: self-hosted
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+
+    steps:
+    - name: Clone the code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        cache: false
+        go-version-file: go.mod
+
+    - name: Download modules
+      run: go mod download
+
+    - name: Install test-helper
+      id: test-helper
+      continue-on-error: true
+      run: |
+        GOBIN="${RUNNER_TEMP}/bin" go install "github.com/blanketops/environments-bots/cmd/test-helper@${TEST_HELPER_REF}"
+        echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+    - name: Mint the test bot's token
+      id: bot-token
+      if: steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ secrets.TESTS_APP_ID }}
+        private-key: ${{ secrets.TESTS_APP_PRIVATE_KEY }}
+        owner: blanketops
+        repositories: environments-tests
+
+    - name: Open issues for new test files
+      if: steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+        PROJECT: ${{ steps.bot-token.outputs.token && 'blanketops/1' || '' }}
+        SOURCE: ${{ github.event.workflow_dispatch.html_url || format('{0}/actions/runs/{1}', github.repository_url, github.run_id) }}
+      run: test-helper sync -source "$SOURCE" ${PROJECT:+-project "$PROJECT"}
+
+    - name: Start Kubernetes API (envtest)
+      run: |
+        envtest-up
+        kubectl version
+
+    - name: Checkout environments-install
+      uses: actions/checkout@v4
+      with:
+        repository: blanketops/environments-install
+        ref: ${{ env.ENVIRONMENTS_INSTALL_REF }}
+        path: environments-install
+
+    - name: Install CRDs
+      run: |
+        cd environments-install
+        mkdir -p bin
+        cp "$(command -v kustomize)" bin/kustomize
+        touch bin/kustomize
+        make install
+
+    - name: Install observer-layer CRDs
+      run: |
+        go mod download github.com/shipwright-io/build github.com/argoproj/argo-events
+        BUILDRUN_CRD="$(go list -m -f '{{.Dir}}' github.com/shipwright-io/build)/deploy/crds/shipwright.io_buildruns.yaml"
+        SENSOR_CRD="$(go list -m -f '{{.Dir}}' github.com/argoproj/argo-events)/manifests/base/crds/argoproj.io_sensors.yaml"
+        kubectl apply --server-side -f "$BUILDRUN_CRD"
+        kubectl apply -f "$SENSOR_CRD"
+        kubectl patch crd buildruns.shipwright.io --type merge -p '{"spec":{"conversion":{"strategy":"None","webhook":null}}}'
+
+    - name: Run full regression test suite
+      run: |
+        TEST_PATH="${{ github.event.inputs.test_path }}"
+        if [ -z "$TEST_PATH" ]; then
+          TEST_PATH="./tests/..."
+        fi
+
+        mkdir -p reports
+        : > reports/regression-output.json
+
+        echo "Running regression tests: $TEST_PATH"
+
+        GINKGO_PKGS=$(go list -f '{{.ImportPath}} {{join .TestImports " "}} {{join .XTestImports " "}}' $TEST_PATH \
+          | awk '/ github.com\/onsi\/ginkgo\/v2( |$)/ {print $1}')
+        OTHER_PKGS=$(go list $TEST_PATH | grep -vxF -e "${GINKGO_PKGS:-^}" || true)
+
+        run_tests() {
+          go test "$@" -v -count=1 -timeout 15m -json 2>&1 \
+            | tee -a reports/regression-output.json
+          return "${PIPESTATUS[0]}"
+        }
+
+        status=0
+        if [ -n "$GINKGO_PKGS" ]; then
+          run_tests $GINKGO_PKGS -ginkgo.json-report=ginkgo-report.json || status=1
+        fi
+        if [ -n "$OTHER_PKGS" ]; then
+          run_tests $OTHER_PKGS || status=1
+        fi
+        exit "$status"
+
+    - name: Post results to the test issues
+      if: always() && steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+        REF: "Regression run #${{ github.run_number }}"
+      run: |
+        args=()
+        while IFS= read -r report; do
+          args+=(-ginkgo-json "$report")
+        done < <(find tests -name ginkgo-report.json)
+        test-helper report -go-json reports/regression-output.json "${args[@]}" -ref "$REF"
+
+    - name: Convert to JUnit XML
+      if: always()
+      run: |
+        go install github.com/jstemmer/go-junit-report/v2@latest
+        cat reports/regression-output.json \
+          | go-junit-report -parser gojson \
+          > reports/regression-junit.xml
+        echo "JUnit report written to reports/regression-junit.xml"
+
+    - name: Upload regression report
+      if: always()
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
+      with:
+        name: regression-report-${{ github.run_number }}
+        path: reports/
+        retention-days: 30
+
+    - name: Publish test results
+      if: always()
+      uses: dorny/test-reporter@v1
+      with:
+        name: "Regression Test Results"
+        path: reports/regression-junit.xml
+        reporter: java-junit
+        fail-on-error: false
+
+    - name: Summary
+      if: always()
+      run: |
+        PASS=$(jq -r 'select(.Action=="pass" and .Test!=null) | .Test' reports/regression-output.json 2>/dev/null | sort -u | wc -l)
+        FAIL=$(jq -r 'select(.Action=="fail" and .Test!=null) | .Test' reports/regression-output.json 2>/dev/null | sort -u | wc -l)
+        SKIP=$(jq -r 'select(.Action=="skip" and .Test!=null) | .Test' reports/regression-output.json 2>/dev/null | sort -u | wc -l)
+
+        {
+          echo "### Regression Test Results"
+          echo ""
+          echo "| Status | Count |"
+          echo "|--------|-------|"
+          echo "| ✅ Passed | $PASS |"
+          echo "| ❌ Failed | $FAIL |"
+          echo "| ⏭️ Skipped | $SKIP |"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+env:
+  ENVIRONMENTS_INSTALL_REF: v0.2.6
+  TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
