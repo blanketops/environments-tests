@@ -11,7 +11,7 @@ on:
             test_path:
                 description: "Path to test (e.g. ./tests/benchmark/... or ./tests/profile/...)"
                 required: false
-                default: "./tests/..."
+                default: "./tests/benchmark/... ./tests/profile/..."
             test_run:
                 description: "Filter by test name (e.g. TestBuildService or Build)"
                 required: false
@@ -125,12 +125,12 @@ jobs:
             - name: Resolve test path
               id: resolve
               run: |
-                  # Use workflow_dispatch input if provided, else run all tests
+                  # Use workflow_dispatch input if provided, else run all benchmark/profile tests
                   TEST_PATH="${{ github.event.inputs.test_path }}"
                   TEST_RUN="${{ github.event.inputs.test_run }}"
 
                   if [ -z "$TEST_PATH" ]; then
-                    TEST_PATH="./tests/..."
+                    TEST_PATH="./tests/benchmark/... ./tests/profile/..."
                   fi
 
                   echo "test_path=$TEST_PATH" >> "$GITHUB_OUTPUT"
@@ -140,7 +140,7 @@ jobs:
             # Two go test calls into one reports/test-output.json: the Ginkgo
             # suites also write a JSON report per package (ginkgo-report.json in
             # the package directory), which maps every spec to its file for
-            # test-helper. The plain Go test packages (tests/grpc) reject the
+            # test-helper. The plain Go test packages (tests/benchmark) reject the
             # -ginkgo.* flag, so they run without it.
             - name: Run tests
               run: |
