@@ -20,6 +20,7 @@ env:
   ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
   ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
   ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+  ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
 
 jobs:
   benchmark:
@@ -144,9 +145,15 @@ jobs:
         ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
         ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
         ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+        ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
       run: |
         # Send benchmark results directly to Allure
-        cat reports/benchmark-output.json | bops-env report --type benchmark --run-id "benchmark-${{ github.run_number }}"
+        cat reports/benchmark-output.json | \
+        curl -s -X POST \
+          -H "Authorization: Bearer ${{ secrets.ALLURE_API_KEY }}" \
+          -H "Host: ${{ env.ALLURE_HOST }}" \
+          -F "files[]=@-;filename=results.json" \
+          "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
 
     - name: Convert to JUnit XML
       if: always()

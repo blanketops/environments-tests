@@ -149,6 +149,22 @@ jobs:
       run: |
         test-helper report -go-json reports/scenario-output.json -ref "$REF"
 
+    - name: Send scenario results to Allure
+      if: always() && env.ALLURE_SERVER_URL != ''
+      continue-on-error: true
+      env:
+        ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+        ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+        ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+        ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
+      run: |
+        cat reports/scenario-output.json | \
+        curl -s -X POST \
+          -H "Authorization: Bearer ${{ secrets.ALLURE_API_KEY }}" \
+          -H "Host: ${{ env.ALLURE_HOST }}" \
+          -F "files[]=@-;filename=results.json" \
+          "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
+
     - name: Upload scenario report
       if: always()
       uses: actions/upload-artifact@v4
@@ -178,3 +194,7 @@ jobs:
 env:
   ENVIRONMENTS_INSTALL_REF: v0.2.6
   TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
+  ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+  ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+  ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+  ALLURE_HOST: ${{ secrets.ALLURE_HOST }}

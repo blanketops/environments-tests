@@ -61,7 +61,7 @@ jobs:
       run: |
         # Run a subset of critical tests to verify system health
         go test ./tests/fake/environments/... -run "TestHealth" -v -count=1 -timeout 5m 2>&1 | tee health-output.txt || true
-        
+
         # Check if any tests ran
         if grep -q "PASS\|FAIL" health-output.txt; then
           echo "Health check tests executed"
@@ -83,5 +83,25 @@ jobs:
         echo "Run at: $(date)" >> $GITHUB_STEP_SUMMARY
         echo "Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
 
+    - name: Send health check results to Allure
+      if: always() && env.ALLURE_SERVER_URL != ''
+      continue-on-error: true
+      env:
+        ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+        ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+        ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+        ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
+      run: |
+        cat health-output.txt | \
+        curl -s -X POST \
+          -H "Authorization: Bearer ${{ secrets.ALLURE_API_KEY }}" \
+          -H "Host: ${{ env.ALLURE_HOST }}" \
+          -F "files[]=@-;filename=results.json" \
+          "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
+
 env:
   ENVIRONMENTS_INSTALL_REF: v0.2.6
+  ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+  ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+  ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+  ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
