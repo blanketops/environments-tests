@@ -30,7 +30,235 @@ env:
   ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
 
 jobs:
-  test:
+  fake-and-grpc-suites:
+    name: fake and gRPC suites (envtest)
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      checks: write
+      # GITHUB_TOKEN can write issues for the fallback below (runs without
+      # the test bot's secrets: forks, Dependabot).
+      issues: write
+
+    steps:
+    - name: Clone the code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        # The self-hosted runners keep Go's module and build caches on a
+        # persistent volume. setup-go's own cache would upload them again
+        # after every job, which on these runners hangs "Post Setup Go" for
+        # up to an hour and holds the runner.
+        cache: false
+        go-version-file: go.mod
+
+    # The committed go.mod/go.sum are authoritative; `go mod tidy` in CI
+    # re-resolves the module graph and can pull in untested versions.
+    - name: Download modules
+      run: go mod download
+
+    - name: Install test-helper
+      id: test-helper
+      continue-on-error: true
+      run: |
+        GOBIN="${RUNNER_TEMP}/bin" go install "github.com/blanketops/environments-bots/cmd/test-helper@${TEST_HELPER_REF}"
+        echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+
+    # One issue per test file under tests/ (tests/data excluded), opened
+    # here so a pull request that adds a test file gets its issue before
+    # the first results are posted. Existing issues are left alone. Never
+    # fails the job: on a fork's pull request the token is read-only.
+    # test-helper acts as the BlanketOps Environments Tests App
+    # (blanketops-environments-tests[bot]): Issues read and write, and
+    # organization Projects read and write, so new issues also go on the
+    # project board. Runs without the secrets (forks, Dependabot) fall back
+    # to this job's GITHUB_TOKEN, which can write issues but not the board.
+    - name: Mint the test bot's token
+      id: bot-token
+      if: steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ secrets.TESTS_APP_ID }}
+        private-key: ${{ secrets.TESTS_APP_PRIVATE_KEY }}
+        owner: blanketops
+        repositories: environments-tests
+
+    - name: Open issues for new test files
+      if: steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+        PROJECT: ${{ steps.bot-token.outputs.token && 'blanketops/1' || '' }}
+        SOURCE: ${{ github.event.pull_request.html_url }}
+      run: test-helper sync -source "$SOURCE" ${PROJECT:+-project "$PROJECT"}
+
+    # The runner pods have no Docker daemon, so kind cannot run here, and a
+    # privileged Docker sidecar would give PR code root on the node. The
+    # tests only need CRDs and the API (no controller, no pods), so etcd and
+    # kube-apiserver from envtest (baked into the runner image) run as the
+    # runner user. envtest-up exports KUBECONFIG for the steps below.
+    - name: Start the Kubernetes API (envtest)
+      run: |
+        envtest-up
+        kubectl version
+
+    - name: Checkout environments-install
+      uses: actions/checkout@v4
+      with:
+        repository: blanketops/environments-install
+        ref: ${{ env.ENVIRONMENTS_INSTALL_REF }}
+        path: environments-install
+
+    - name: Install CRDs
+      run: |
+        cd environments-install
+        # The Makefile downloads kustomize into bin/ unless it is there;
+        # use the runner image's copy (same version, KUSTOMIZE_VERSION).
+        mkdir -p bin
+        cp "$(command -v kustomize)" bin/kustomize
+        touch bin/kustomize
+        make install
+
+    - name: Install observer-layer CRDs
+      run: |
+        # tests/fake/observers drives Shipwright BuildRun and Argo Events
+        # Sensor objects directly (same "no controller, just the CRD"
+        # pattern as the BlanketOps CRDs above) — pull them straight from
+        # the already-downloaded Go module cache rather than fetching
+        # upstream release manifests separately.
+        go mod download github.com/shipwright-io/build github.com/argoproj/argo-events
+        BUILDRUN_CRD="$(go list -m -f '{{.Dir}}' github.com/shipwright-io/build)/deploy/crds/shipwright.io_buildruns.yaml"
+        SENSOR_CRD="$(go list -m -f '{{.Dir}}' github.com/argoproj/argo-events)/manifests/base/crds/argoproj.io_sensors.yaml"
+
+        # buildruns.shipwright.io exceeds kubectl apply's
+        # last-applied-configuration annotation size limit.
+        kubectl apply --server-side -f "$BUILDRUN_CRD"
+        kubectl apply -f "$SENSOR_CRD"
+
+        # BuildRun is multi-version (v1alpha1/v1beta1) with a conversion
+        # webhook pointing at Shipwright's own controller, which isn't
+        # installed here — these tests only ever touch it through the
+        # v1alpha1 client type, so disable conversion rather than standing
+        # up the full Shipwright operator just for CRD registration.
+        kubectl patch crd buildruns.shipwright.io --type merge -p '{"spec":{"conversion":{"strategy":"None","webhook":null}}}'
+
+    - name: Resolve test path
+      id: resolve
+      run: |
+        # Use workflow_dispatch input if provided, else run all tests
+        TEST_PATH="${{ github.event.inputs.test_path }}"
+        TEST_RUN="${{ github.event.inputs.test_run }}"
+
+        if [ -z "$TEST_PATH" ]; then
+          TEST_PATH="./tests/..."
+        fi
+
+        echo "test_path=$TEST_PATH" >> "$GITHUB_OUTPUT"
+        echo "test_run=$TEST_RUN"   >> "$GITHUB_OUTPUT"
+        echo "Running: $TEST_PATH ${TEST_RUN:+-run $TEST_RUN}"
+
+    # Two go test calls into one reports/test-output.json: the Ginkgo
+    # suites also write a JSON report per package (ginkgo-report.json in
+    # the package directory), which maps every spec to its file for
+    # test-helper. The plain Go test packages (tests/grpc) reject the
+    # -ginkgo.* flag, so they run without it.
+    - name: Run tests
+      run: |
+        TEST_PATH="${{ steps.resolve.outputs.test_path }}"
+        TEST_RUN="${{ steps.resolve.outputs.test_run }}"
+
+        mkdir -p reports
+        : > reports/test-output.json
+
+        RUN_ARGS=()
+        if [ -n "$TEST_RUN" ]; then
+          RUN_ARGS=(-run "$TEST_RUN")
+        fi
+
+        # shellcheck disable=SC2086 # TEST_PATH may list several patterns
+        GINKGO_PKGS=$(go list -f '{{.ImportPath}} {{join .TestImports " "}} {{join .XTestImports " "}}' $TEST_PATH \
+          | awk '/ github.com\/onsi\/ginkgo\/v2( |$)/ {print $1}')
+        # shellcheck disable=SC2086
+        OTHER_PKGS=$(go list $TEST_PATH | grep -vxF -e "${GINKGO_PKGS:-^}" || true)
+
+        run_tests() {
+          go test "$@" "${RUN_ARGS[@]}" -v -count=1 -timeout 10m -json 2>&1 \
+            | tee -a reports/test-output.json
+          return "${PIPESTATUS[0]}"
+        }
+
+        status=0
+        if [ -n "$GINKGO_PKGS" ]; then
+          # shellcheck disable=SC2086 # one argument per package
+          run_tests $GINKGO_PKGS -ginkgo.json-report=ginkgo-report.json || status=1
+        fi
+        if [ -n "$OTHER_PKGS" ]; then
+          # shellcheck disable=SC2086
+          run_tests $OTHER_PKGS || status=1
+        fi
+        exit "$status"
+
+    # Comments each test file's results on its issue, with a link to this
+    # run. Runs whether the tests passed or failed; never fails the job.
+    - name: Post results to the test issues
+      if: always() && steps.test-helper.outcome == 'success'
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+        REF: "${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }}"
+      run: |
+        args=()
+        while IFS= read -r report; do
+          args+=(-ginkgo-json "$report")
+        done < <(find tests -name ginkgo-report.json)
+        test-helper report -go-json reports/test-output.json "${args[@]}" -ref "$REF"
+
+    - name: Send test results to Allure
+      if: always() && env.ALLURE_SERVER_URL != ''
+      continue-on-error: true
+      env:
+        ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+        ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+        ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+        ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
+      run: |
+        cat reports/test-output.json | \
+        curl -s -X POST \
+          -H "Authorization: Bearer ${{ secrets.ALLURE_API_KEY }}" \
+          -H "Host: ${{ env.ALLURE_HOST }}" \
+          -F "files[]=@-;filename=results.json" \
+          "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
+
+    - name: Convert to JUnit XML
+      if: always()
+      run: |
+        # go-junit-report converts go test -json to JUnit XML for artifact upload
+        go install github.com/jstemmer/go-junit-report/v2@latest
+        cat reports/test-output.json \
+          | go-junit-report -parser gojson \
+          > reports/junit.xml
+        echo "JUnit report written to reports/junit.xml"
+
+    - name: Summary
+      if: always()
+      run: |
+        PASS=$(jq -r 'select(.Action=="pass" and .Test!=null) | .Test' reports/test-output.json 2>/dev/null | sort -u | wc -l)
+        FAIL=$(jq -r 'select(.Action=="fail" and .Test!=null) | .Test' reports/test-output.json 2>/dev/null | sort -u | wc -l)
+        SKIP=$(jq -r 'select(.Action=="skip" and .Test!=null) | .Test' reports/test-output.json 2>/dev/null | sort -u | wc -l)
+
+        {
+          echo "### Test results — \`${{ steps.resolve.outputs.test_path }}\`"
+          echo ""
+          echo "| Status | Count |"
+          echo "|--------|-------|"
+          echo "| ✅ Passed | $PASS |"
+          echo "| ❌ Failed | $FAIL |"
+          echo "| ⏭️ Skipped | $SKIP |"
+        } >> "$GITHUB_STEP_SUMMARY"
+  benchmark-and-profiling-suites:
     name: fake and gRPC suites (envtest)
     runs-on: self-hosted
     permissions:
