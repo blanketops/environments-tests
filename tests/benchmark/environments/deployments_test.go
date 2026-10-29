@@ -15,7 +15,7 @@ limitations under the License.
 
 // Package deployments contains performance benchmarks for Deployment CR.
 // Run with: go test -bench=. -benchmem ./tests/benchmark/deployments/...
-package deployments
+package environments
 
 import (
 	"context"

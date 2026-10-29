@@ -13,9 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package git contains performance benchmarks for Git-related CRs.
-// Run with: go test -bench=. -benchmem ./tests/benchmark/git/...
-package git
+// Package sources contains performance benchmarks for GitRepository CR.
+// Run with: go test -bench=. -benchmem ./tests/benchmark/sources/...
+package sources
 
 import (
 	"context"
