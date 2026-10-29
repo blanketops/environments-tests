@@ -23,7 +23,7 @@ on:
 # yet, so it is pinned to a commit; switch to a release tag once there is one.
 env:
     ENVIRONMENTS_INSTALL_REF: v0.2.6
-    TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
+    TEST_HELPER_REF: de08714b3f5b6ea410ece2a0e639569a8ba3db1e
     ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
     ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
     ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
@@ -86,14 +86,33 @@ jobs:
                   owner: blanketops
                   repositories: environments-tests
 
-            - name: Open issues for new test files
+            # One issue per benchmark/profile test file under tests/benchmark and
+            # tests/profile (tests/data, tests/fake, tests/grpc excluded). Opened
+            # here so a pull request that adds a test file gets its issue before
+            # the first results are posted. Existing issues are left alone. Never
+            # fails the job: on a fork's pull request the token is read-only.
+            # test-helper acts as the BlanketOps Environments Tests App
+            # (blanketops-environments-tests[bot]): Issues read and write, and
+            # organization Projects read and write, so new issues also go on the
+            # project board. Runs without the secrets (forks, Dependabot) fall back
+            # to this job's GITHUB_TOKEN, which can write issues but not the board.
+            - name: Open issues for new benchmark test files
               if: steps.test-helper.outcome == 'success'
               continue-on-error: true
               env:
                   GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
                   PROJECT: ${{ steps.bot-token.outputs.token && 'blanketops/1' || '' }}
                   SOURCE: ${{ github.event.pull_request.html_url }}
-              run: test-helper sync -source "$SOURCE" ${PROJECT:+-project "$PROJECT"}
+              run: test-helper sync -source "$SOURCE" ${PROJECT:+-project "$PROJECT"} -layer benchmark
+
+            - name: Open issues for new profile test files
+              if: steps.test-helper.outcome == 'success'
+              continue-on-error: true
+              env:
+                  GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+                  PROJECT: ${{ steps.bot-token.outputs.token && 'blanketops/1' || '' }}
+                  SOURCE: ${{ github.event.pull_request.html_url }}
+              run: test-helper sync -source "$SOURCE" ${PROJECT:+-project "$PROJECT"} -layer profile
 
             # The runner pods have no Docker daemon, so kind cannot run here, and a
             # privileged Docker sidecar would give PR code root on the node. The
@@ -180,18 +199,23 @@ jobs:
 
             # Comments each test file's results on its issue, with a link to this
             # run. Runs whether the tests passed or failed; never fails the job.
-            - name: Post results to the test issues
+            - name: Post benchmark results to the test issues
               if: always() && steps.test-helper.outcome == 'success'
               continue-on-error: true
               env:
                   GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
                   REF: "${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }}"
               run: |
-                  args=()
-                  while IFS= read -r report; do
-                    args+=(-ginkgo-json "$report")
-                  done < <(find tests -name ginkgo-report.json)
-                  test-helper report -go-json reports/test-output.json "${args[@]}" -ref "$REF"
+                  test-helper report -go-json reports/test-output.json -ref "$REF" -layer benchmark
+
+            - name: Post profile results to the test issues
+              if: always() && steps.test-helper.outcome == 'success'
+              continue-on-error: true
+              env:
+                  GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
+                  REF: "${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.number) || github.ref_name }}"
+              run: |
+                  test-helper report -go-json reports/test-output.json -ref "$REF" -layer profile
 
             - name: Send test results to Allure
               if: always() && env.ALLURE_SERVER_URL != ''

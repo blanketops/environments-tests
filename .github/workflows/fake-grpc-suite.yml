@@ -23,7 +23,7 @@ on:
 # yet, so it is pinned to a commit; switch to a release tag once there is one.
 env:
   ENVIRONMENTS_INSTALL_REF: v0.2.6
-  TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
+  TEST_HELPER_REF: de08714b3f5b6ea410ece2a0e639569a8ba3db1e
   ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
   ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
   ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
