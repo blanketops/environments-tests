@@ -17,6 +17,9 @@ on:
 env:
   ENVIRONMENTS_INSTALL_REF: v0.2.6
   TEST_HELPER_REF: e5ebf4cdf4a8ece7821f6142813f40ecbe11715d
+  ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+  ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+  ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
 
 jobs:
   benchmark:
@@ -110,7 +113,7 @@ jobs:
         echo "bench_filter=$BENCH_FILTER" >> "$GITHUB_OUTPUT"
         echo "Running benchmarks: $TEST_PATH -bench $BENCH_FILTER"
 
-    - name: Run benchmarks
+    - name: Run benchmarks and send to Allure
       run: |
         TEST_PATH="${{ steps.resolve.outputs.test_path }}"
         BENCH_FILTER="${{ steps.resolve.outputs.bench_filter }}"
@@ -134,14 +137,16 @@ jobs:
             | tee -a reports/benchmark-output.json
         done
 
-    - name: Post results to the test issues
-      if: always() && steps.test-helper.outcome == 'success'
+    - name: Send benchmark results to Allure
+      if: always() && env.ALLURE_SERVER_URL != ''
       continue-on-error: true
       env:
-        GH_TOKEN: ${{ steps.bot-token.outputs.token || secrets.GITHUB_TOKEN }}
-        REF: "Benchmark run #${{ github.run_number }}"
+        ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+        ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+        ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
       run: |
-        test-helper report -go-json reports/benchmark-output.json -ref "$REF"
+        # Send benchmark results directly to Allure
+        cat reports/benchmark-output.json | bops-env report --type benchmark --run-id "benchmark-${{ github.run_number }}"
 
     - name: Convert to JUnit XML
       if: always()
@@ -151,15 +156,6 @@ jobs:
           | go-junit-report -parser gojson \
           > reports/benchmark-junit.xml
         echo "JUnit report written to reports/benchmark-junit.xml"
-
-    - name: Upload benchmark report
-      if: always()
-      uses: actions/upload-artifact@v4
-      continue-on-error: true
-      with:
-        name: benchmark-report-${{ github.run_number }}
-        path: reports/
-        retention-days: 30
 
     - name: Summary
       if: always()
