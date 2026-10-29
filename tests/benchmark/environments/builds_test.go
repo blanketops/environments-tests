@@ -15,7 +15,7 @@ limitations under the License.
 
 // Package builds contains performance benchmarks for Build CR.
 // Run with: go test -bench=. -benchmem ./tests/benchmark/builds/...
-package builds
+package environments
 
 import (
 	"context"
