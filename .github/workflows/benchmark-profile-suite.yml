@@ -217,6 +217,26 @@ jobs:
               run: |
                   test-helper report -go-json reports/test-output.json -ref "$REF" -layer profile
 
+            - name: Convert to JUnit XML
+              if: always()
+              run: |
+                  # go-junit-report converts go test -json to JUnit XML for artifact upload
+                  go install github.com/jstemmer/go-junit-report/v2@latest
+                  cat reports/test-output.json \
+                    | go-junit-report -parser gojson \
+                    > reports/junit.xml
+                  echo "JUnit report written to reports/junit.xml"
+
+            - name: Convert to JUnit XML
+              if: always()
+              run: |
+                  # go-junit-report converts go test -json to JUnit XML for artifact upload
+                  go install github.com/jstemmer/go-junit-report/v2@latest
+                  cat reports/test-output.json \
+                    | go-junit-report -parser gojson \
+                    > reports/junit.xml
+                  echo "JUnit report written to reports/junit.xml"
+
             - name: Send test results to Allure
               if: always() && env.ALLURE_SERVER_URL != ''
               continue-on-error: true
@@ -233,15 +253,21 @@ jobs:
                                   -F "files[]=@-;filename=junit.xml" \
                                   "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
 
-            - name: Convert to JUnit XML
-              if: always()
+            - name: Send test results to Allure
+              if: always() && env.ALLURE_SERVER_URL != ''
+              continue-on-error: true
+              env:
+                  ALLURE_SERVER_URL: ${{ secrets.ALLURE_SERVER_URL }}
+                  ALLURE_PROJECT_NAME: ${{ secrets.ALLURE_PROJECT_NAME }}
+                  ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
+                  ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
               run: |
-                  # go-junit-report converts go test -json to JUnit XML for artifact upload
-                  go install github.com/jstemmer/go-junit-report/v2@latest
-                  cat reports/test-output.json \
-                    | go-junit-report -parser gojson \
-                    > reports/junit.xml
-                  echo "JUnit report written to reports/junit.xml"
+                                cat reports/junit.xml | \
+                                curl -s -X POST \
+                                  -H "Authorization: Bearer ${{ secrets.ALLURE_API_KEY }}" \
+                                  -H "Host: ${{ env.ALLURE_HOST }}" \
+                                  -F "files[]=@-;filename=junit.xml" \
+                                  "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
 
             - name: Summary
               if: always()

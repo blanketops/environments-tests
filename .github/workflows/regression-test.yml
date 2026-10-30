@@ -133,6 +133,15 @@ jobs:
         done < <(find tests -name ginkgo-report.json)
         test-helper report -go-json reports/regression-output.json "${args[@]}" -ref "$REF"
 
+    - name: Convert to JUnit XML
+      if: always()
+      run: |
+        go install github.com/jstemmer/go-junit-report/v2@latest
+        cat reports/regression-output.json \
+          | go-junit-report -parser gojson \
+          > reports/regression-junit.xml
+        echo "JUnit report written to reports/regression-junit.xml"
+
     - name: Send regression results to Allure
       if: always() && env.ALLURE_SERVER_URL != ''
       continue-on-error: true
@@ -148,15 +157,6 @@ jobs:
           -H "Host: ${{ env.ALLURE_HOST }}" \
           -F "files[]=@-;filename=junit.xml" \
           "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
-
-    - name: Convert to JUnit XML
-      if: always()
-      run: |
-        go install github.com/jstemmer/go-junit-report/v2@latest
-        cat reports/regression-output.json \
-          | go-junit-report -parser gojson \
-          > reports/regression-junit.xml
-        echo "JUnit report written to reports/regression-junit.xml"
 
     - name: Upload regression report
       if: always()

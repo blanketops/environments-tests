@@ -138,6 +138,15 @@ jobs:
             | tee -a reports/benchmark-output.json
         done
 
+    - name: Convert to JUnit XML
+      if: always()
+      run: |
+        go install github.com/jstemmer/go-junit-report/v2@latest
+        cat reports/benchmark-output.json \
+          | go-junit-report -parser gojson \
+          > reports/benchmark-junit.xml
+        echo "JUnit report written to reports/benchmark-junit.xml"
+
     - name: Send benchmark results to Allure
       if: always() && env.ALLURE_SERVER_URL != ''
       continue-on-error: true
@@ -154,15 +163,6 @@ jobs:
           -H "Host: ${{ env.ALLURE_HOST }}" \
           -F "files[]=@-;filename=junit.xml" \
           "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
-
-    - name: Convert to JUnit XML
-      if: always()
-      run: |
-        go install github.com/jstemmer/go-junit-report/v2@latest
-        cat reports/benchmark-output.json \
-          | go-junit-report -parser gojson \
-          > reports/benchmark-junit.xml
-        echo "JUnit report written to reports/benchmark-junit.xml"
 
     - name: Summary
       if: always()

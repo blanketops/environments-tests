@@ -75,7 +75,18 @@ jobs:
         # Quick check that all CRDs are installed
         kubectl get crd | grep -E "(zenithrunner|zenithrunnerapp|environment|build|deployment)" | wc -l
 
-    - name: Summary
+          # Convert test output to JUnit XML for Allure
+      - name: Convert to JUnit XML
+        if: always()
+        run: |
+          # go-junit-report converts go test -json to JUnit XML
+          go install github.com/jstemmer/go-junit-report/v2@latest
+          cat reports/health-output.txt \
+            | go-junit-report -parser gojson \
+            > reports/junit.xml
+          echo "JUnit report written to reports/junit.xml"
+
+- name: Summary
       if: always()
       run: |
         echo "### Health Check Results" >> $GITHUB_STEP_SUMMARY

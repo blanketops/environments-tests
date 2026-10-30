@@ -140,7 +140,18 @@ jobs:
             ;;
         esac
 
-    - name: Post results to the test issues
+          # Convert test output to JUnit XML for Allure
+      - name: Convert to JUnit XML
+        if: always()
+        run: |
+          # go-junit-report converts go test -json to JUnit XML
+          go install github.com/jstemmer/go-junit-report/v2@latest
+          cat reports/scenario-output.json \
+            | go-junit-report -parser gojson \
+            > reports/junit.xml
+          echo "JUnit report written to reports/junit.xml"
+
+- name: Post results to the test issues
       if: always() && steps.test-helper.outcome == 'success'
       continue-on-error: true
       env:
@@ -158,7 +169,7 @@ jobs:
         ALLURE_API_KEY: ${{ secrets.ALLURE_API_KEY }}
         ALLURE_HOST: ${{ secrets.ALLURE_HOST }}
       run: |
-        cat reports/scenario-output.json | \
+        cat reports/junit.xml | \
         curl -s -X POST \
           -H "Authorization: Bearer ${{ secrets.ALLURE_API_KEY }}" \
           -H "Host: ${{ env.ALLURE_HOST }}" \
