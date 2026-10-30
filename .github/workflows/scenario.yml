@@ -162,7 +162,7 @@ jobs:
         curl -s -X POST \
           -H "Authorization: Bearer ${{ secrets.ALLURE_API_KEY }}" \
           -H "Host: ${{ env.ALLURE_HOST }}" \
-          -F "files[]=@-;filename=results.json" \
+          -F "files[]=@-;filename=junit.xml" \
           "${{ env.ALLURE_SERVER_URL }}/allure-docker-service/send-results?project_id=${{ env.ALLURE_PROJECT_NAME }}&force_project_creation=true"
 
     - name: Upload scenario report
