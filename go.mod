@@ -22,6 +22,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.25.2
 )
 
+replace github.com/blanketops/environments => ../environments
+
 require (
 	carvel.dev/kapp-controller v0.60.9 // indirect
 	carvel.dev/vendir v0.46.2 // indirect
