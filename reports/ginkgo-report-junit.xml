@@ -1,0 +1,133 @@
+<?xml version="1.0" ?>
+<testsuites>
+  <testsuite name="Controller Suite" tests="8" failures="8" errors="0" skipped="0" time="0.051" timestamp="2026-10-30T10:28:37.737888724+02:00">
+    <properties>
+      <property name="suite_path" value="/home/blanketops/BlanketOps/environments-tests/tests/fake/sources"/>
+      <property name="random_seed" value="1793348917"/>
+    </properties>
+    <testcase name="GitRepository Controller Basic reconciliation behaviour routes the GitRepository update through the engine to the GitRepository domain" classname="gitrepository" time="0.015">
+      <failure message="Unexpected error:&#10;    &lt;*meta.NoKindMatchError | 0xc1e939cce00&gt;: &#10;    no matches for kind &quot;GitRepository&quot; in version &quot;sources.blanketops.dev/v1alpha1&quot;&#10;    {&#10;        GroupKind: {&#10;            Group: &quot;sources.blanketops.dev&quot;,&#10;            Kind: &quot;GitRepository&quot;,&#10;        },&#10;        SearchedVersions: [&quot;v1alpha1&quot;],&#10;    }&#10;occurred" type="AssertionError">&lt;![CDATA[Unexpected error:
+    &lt;*meta.NoKindMatchError | 0xc1e939cce00&gt;: 
+    no matches for kind "GitRepository" in version "sources.blanketops.dev/v1alpha1"
+    {
+        GroupKind: {
+            Group: "sources.blanketops.dev",
+            Kind: "GitRepository",
+        },
+        SearchedVersions: ["v1alpha1"],
+    }
+occurred
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:180
+
+]]&gt;</failure>
+    </testcase>
+    <testcase name="GitRepository Controller Basic reconciliation behaviour is idempotent when reconciling the same GitRepository multiple times" classname="gitrepository" time="0.005">
+      <failure message="Unexpected error:&#10;    &lt;*meta.NoKindMatchError | 0xc1e93716ac0&gt;: &#10;    no matches for kind &quot;GitRepository&quot; in version &quot;sources.blanketops.dev/v1alpha1&quot;&#10;    {&#10;        GroupKind: {&#10;            Group: &quot;sources.blanketops.dev&quot;,&#10;            Kind: &quot;GitRepository&quot;,&#10;        },&#10;        SearchedVersions: [&quot;v1alpha1&quot;],&#10;    }&#10;occurred" type="AssertionError">&lt;![CDATA[Unexpected error:
+    &lt;*meta.NoKindMatchError | 0xc1e93716ac0&gt;: 
+    no matches for kind "GitRepository" in version "sources.blanketops.dev/v1alpha1"
+    {
+        GroupKind: {
+            Group: "sources.blanketops.dev",
+            Kind: "GitRepository",
+        },
+        SearchedVersions: ["v1alpha1"],
+    }
+occurred
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:195
+
+]]&gt;</failure>
+    </testcase>
+    <testcase name="GitRepository Controller Basic reconciliation behaviour returns an error when the GitRepository domain fails" classname="gitrepository" time="0.013">
+      <failure message="Expected&#10;    &lt;bool&gt;: false&#10;to be true" type="AssertionError">&lt;![CDATA[Expected
+    &lt;bool&gt;: false
+to be true
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:217
+
+]]&gt;</failure>
+    </testcase>
+    <testcase name="GitRepository Controller GitRepository webhook event routing routes GitRepository with correct webhook events to the domain push and pull_request — cloudflared tunnel" classname="gitrepository" time="0.004">
+      <failure message="Expected success, but got an error:&#10;    &lt;*meta.NoKindMatchError | 0xc1e93d0ab80&gt;: &#10;    no matches for kind &quot;GitRepository&quot; in version &quot;sources.blanketops.dev/v1alpha1&quot;&#10;    {&#10;        GroupKind: {&#10;            Group: &quot;sources.blanketops.dev&quot;,&#10;            Kind: &quot;GitRepository&quot;,&#10;        },&#10;        SearchedVersions: [&quot;v1alpha1&quot;],&#10;    }" type="AssertionError">&lt;![CDATA[Expected success, but got an error:
+    &lt;*meta.NoKindMatchError | 0xc1e93d0ab80&gt;: 
+    no matches for kind "GitRepository" in version "sources.blanketops.dev/v1alpha1"
+    {
+        GroupKind: {
+            Group: "sources.blanketops.dev",
+            Kind: "GitRepository",
+        },
+        SearchedVersions: ["v1alpha1"],
+    }
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:248
+
+]]&gt;</failure>
+    </testcase>
+    <testcase name="GitRepository Controller GitRepository webhook event routing routes GitRepository with correct webhook events to the domain push only — cloudflared tunnel" classname="gitrepository" time="0.002">
+      <failure message="Expected success, but got an error:&#10;    &lt;*meta.NoKindMatchError | 0xc1e93b1a6c0&gt;: &#10;    no matches for kind &quot;GitRepository&quot; in version &quot;sources.blanketops.dev/v1alpha1&quot;&#10;    {&#10;        GroupKind: {&#10;            Group: &quot;sources.blanketops.dev&quot;,&#10;            Kind: &quot;GitRepository&quot;,&#10;        },&#10;        SearchedVersions: [&quot;v1alpha1&quot;],&#10;    }" type="AssertionError">&lt;![CDATA[Expected success, but got an error:
+    &lt;*meta.NoKindMatchError | 0xc1e93b1a6c0&gt;: 
+    no matches for kind "GitRepository" in version "sources.blanketops.dev/v1alpha1"
+    {
+        GroupKind: {
+            Group: "sources.blanketops.dev",
+            Kind: "GitRepository",
+        },
+        SearchedVersions: ["v1alpha1"],
+    }
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:248
+
+]]&gt;</failure>
+    </testcase>
+    <testcase name="GitRepository Controller GitRepository webhook event routing routes GitRepository with correct webhook events to the domain push and pull_request — production ingress URL" classname="gitrepository" time="0.005">
+      <failure message="Expected success, but got an error:&#10;    &lt;*meta.NoKindMatchError | 0xc1e94192dc0&gt;: &#10;    no matches for kind &quot;GitRepository&quot; in version &quot;sources.blanketops.dev/v1alpha1&quot;&#10;    {&#10;        GroupKind: {&#10;            Group: &quot;sources.blanketops.dev&quot;,&#10;            Kind: &quot;GitRepository&quot;,&#10;        },&#10;        SearchedVersions: [&quot;v1alpha1&quot;],&#10;    }" type="AssertionError">&lt;![CDATA[Expected success, but got an error:
+    &lt;*meta.NoKindMatchError | 0xc1e94192dc0&gt;: 
+    no matches for kind "GitRepository" in version "sources.blanketops.dev/v1alpha1"
+    {
+        GroupKind: {
+            Group: "sources.blanketops.dev",
+            Kind: "GitRepository",
+        },
+        SearchedVersions: ["v1alpha1"],
+    }
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:248
+
+]]&gt;</failure>
+    </testcase>
+    <testcase name="GitRepository Controller GitRepository owner and name carries the repository owner and name through to the domain" classname="gitrepository" time="0.002">
+      <failure message="Expected success, but got an error:&#10;    &lt;*meta.NoKindMatchError | 0xc1e93b3d500&gt;: &#10;    no matches for kind &quot;GitRepository&quot; in version &quot;sources.blanketops.dev/v1alpha1&quot;&#10;    {&#10;        GroupKind: {&#10;            Group: &quot;sources.blanketops.dev&quot;,&#10;            Kind: &quot;GitRepository&quot;,&#10;        },&#10;        SearchedVersions: [&quot;v1alpha1&quot;],&#10;    }" type="AssertionError">&lt;![CDATA[Expected success, but got an error:
+    &lt;*meta.NoKindMatchError | 0xc1e93b3d500&gt;: 
+    no matches for kind "GitRepository" in version "sources.blanketops.dev/v1alpha1"
+    {
+        GroupKind: {
+            Group: "sources.blanketops.dev",
+            Kind: "GitRepository",
+        },
+        SearchedVersions: ["v1alpha1"],
+    }
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:328
+
+]]&gt;</failure>
+    </testcase>
+    <testcase name="GitRepository Controller GitRepository not found returns no error when the GitRepository CR no longer exists" classname="gitrepository" time="0.002">
+      <failure message="Unexpected error:&#10;    &lt;*meta.NoKindMatchError | 0xc1e93d0bcc0&gt;: &#10;    no matches for kind &quot;GitRepository&quot; in version &quot;sources.blanketops.dev/v1alpha1&quot;&#10;    {&#10;        GroupKind: {&#10;            Group: &quot;sources.blanketops.dev&quot;,&#10;            Kind: &quot;GitRepository&quot;,&#10;        },&#10;        SearchedVersions: [&quot;v1alpha1&quot;],&#10;    }&#10;occurred" type="AssertionError">&lt;![CDATA[Unexpected error:
+    &lt;*meta.NoKindMatchError | 0xc1e93d0bcc0&gt;: 
+    no matches for kind "GitRepository" in version "sources.blanketops.dev/v1alpha1"
+    {
+        GroupKind: {
+            Group: "sources.blanketops.dev",
+            Kind: "GitRepository",
+        },
+        SearchedVersions: ["v1alpha1"],
+    }
+occurred
+
+File: /home/blanketops/BlanketOps/environments-tests/tests/fake/sources/gitrepository_test.go:375
+
+]]&gt;</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
