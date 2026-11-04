@@ -1,10 +1,17 @@
-# tests/data only: fixture builders and engine conformance tests, which need
-# no cluster. The suites under tests/fake and tests/grpc run in run-tests.yml.
+# =============================================================================
+# test.yml — Fixtures and Conformance (tests/data)
+#
+# Runs fixture builders and engine conformance tests from tests/data only
+# (no cluster needed). The suites under tests/fake and tests/grpc run in
+# run-tests.yml. Pushes run only on the long-lived branches; work branches
+# run through their pull request.
+#
+# Trigger scope:
+#   push to test/master; pull_request
+#
+# Secrets required: none
+# =============================================================================
 name: Data Tests
-
-# Pushes run only on the long-lived branches; work branches run through their
-# pull request. With both triggers on every branch, each check ran twice on a
-# pull request and queued twice on the repository's single runner.
 on:
   push:
     branches: [test, master]

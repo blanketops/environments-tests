@@ -1,5 +1,17 @@
+# =============================================================================
+# benchmark.yml — Benchmark Tests
+#
+# Runs benchmark suites against a configured test path, sending results to
+# Allure and producing a JUnit report. Triggered weekly and on manual
+# dispatch.
+#
+# Trigger scope:
+#   weekly schedule (Monday 02:00 UTC); workflow_dispatch
+#
+# Secrets required:
+#   ALLURE_SERVER_URL, ALLURE_PROJECT_NAME, ALLURE_API_KEY, ALLURE_HOST
+# =============================================================================
 name: Benchmark Tests
-
 on:
   schedule:
     - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM
