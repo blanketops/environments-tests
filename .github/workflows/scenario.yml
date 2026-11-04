@@ -1,5 +1,17 @@
+# =============================================================================
+# scenario.yml — Scenario Tests
+#
+# Runs scenario test suites (full, upgrade, rollback, multi-env, git-auth,
+# secret-rotation) against envtest. Triggered weekly and on manual dispatch.
+#
+# Trigger scope:
+#   weekly schedule (Sunday 03:00 UTC); workflow_dispatch
+#
+# Secrets required:
+#   ALLURE_SERVER_URL, ALLURE_PROJECT_NAME, ALLURE_API_KEY, ALLURE_HOST,
+#   TESTS_APP_ID, TESTS_APP_PRIVATE_KEY
+# =============================================================================
 name: Scenario Tests
-
 on:
   schedule:
     - cron: '0 3 * * 0'  # Weekly on Sunday at 3 AM
@@ -54,7 +66,7 @@ jobs:
       continue-on-error: true
       uses: actions/create-github-app-token@v3
       with:
-        app-id: ${{ secrets.TESTS_APP_ID }}
+        client-id: ${{ secrets.TESTS_APP_ID }}
         private-key: ${{ secrets.TESTS_APP_PRIVATE_KEY }}
         owner: blanketops
         repositories: environments-tests
