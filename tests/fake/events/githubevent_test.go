@@ -275,7 +275,7 @@ var _ = Describe("GitHubEvent Controller", func() {
 				Expect(string(contract.EventType)).To(Equal(string(tc.eventType)))
 				Expect(contract.Ref).To(Equal(tc.ref))
 				// Repository must always be owner/name format
-				Expect(contract.Repository).To(Equal("ntlaletsi70/" + tc.envName))
+				Expect(contract.Repository).To(Equal("blanketops/" + tc.envName))
 				// Webhook secret ref must be present
 				Expect(contract.Webhook.SecretRef.Name).To(Equal("github-webhook-secret"))
 				Expect(contract.Webhook.SecretRef.Key).To(Equal("secret"))

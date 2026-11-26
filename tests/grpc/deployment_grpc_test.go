@@ -48,7 +48,7 @@ func newDeploymentSpec() *deploymentpb.DeploymentSpec {
 		},
 		ImageAutomation: false,
 		ManifestsRepo: &deploymentpb.ManifestsRepo{
-			Url:         "git@github.com:ntlaletsi70/for-kaniko-app-manifests.git",
+			Url:         "git@github.com:blanketops/for-kaniko-app-manifests.git",
 			Ref:         mainBranch,
 			CloneSecret: gitSSHSecret,
 			Strategy:    "kustomize",

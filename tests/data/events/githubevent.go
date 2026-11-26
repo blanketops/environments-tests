@@ -53,7 +53,7 @@ type GitHubEventSpec struct {
 type GitHubEventContract struct {
 	// Repository in owner/name format.
 	// Must match exactly — the controller uses this to scope the EventSource.
-	// e.g. ntlaletsi70/for-kaniko-app
+	// e.g. blanketops/for-kaniko-app
 	Repository string `json:"repository"`
 
 	// Git event type to listen for.
@@ -179,12 +179,12 @@ func NewGitHubEventData(name, envName string) *GitHubEventData {
 		},
 		Spec: GitHubEventSpec{
 			Contract: GitHubEventContract{
-				Repository: "ntlaletsi70/" + envName,
+				Repository: "blanketops/" + envName,
 				EventType:  GitHubEventTypePush,
 				EventID:    "delivery-" + name,
 				Ref:        "refs/heads/main",
 				CommitSHA:  "0123456789abcdef0123456789abcdef01234567",
-				Actor:      "ntlaletsi70",
+				Actor:      "blanketops",
 				Webhook: Webhook{
 					SecretRef: SecretRef{
 						Name: "github-webhook-secret",

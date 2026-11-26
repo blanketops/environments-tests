@@ -43,11 +43,11 @@ import (
 
 func newPushGitHubEventSpec() *githubeventpb.GitHubEventSpec {
 	return &githubeventpb.GitHubEventSpec{
-		Repository:       "ntlaletsi70/for-kaniko-app",
+		Repository:       "blanketops/for-kaniko-app",
 		EventType:        &commonv1.GitHubEventType{Type: commonv1.GitHubEventType_GIT_HUB_EVENT_TYPE_PUSH},
 		Ref:              "refs/heads/main",
 		CommitSha:        testCommitSHA,
-		Actor:            "ntlaletsi70",
+		Actor:            "blanketops",
 		EventId:          "delivery-001",
 		WebhookSecretRef: "github-webhook-secret",
 	}
@@ -88,7 +88,7 @@ func TestGitHubEventService_CreateGitHubEvent(t *testing.T) {
 
 	assert.Equal(t, commonv1.GitHubEventType_GIT_HUB_EVENT_TYPE_PUSH, event.GetSpec().GetEventType().GetType())
 	assert.Equal(t, "github-webhook-secret", event.GetSpec().GetWebhookSecretRef())
-	assert.Equal(t, "ntlaletsi70/for-kaniko-app", event.GetSpec().GetRepository())
+	assert.Equal(t, "blanketops/for-kaniko-app", event.GetSpec().GetRepository())
 }
 
 func TestGitHubEventService_GetGitHubEvent(t *testing.T) {
@@ -121,7 +121,7 @@ func TestGitHubEventService_ListGitHubEvents(t *testing.T) {
 	}
 	assert.True(t, found, "expected ListGitHubEvents to include the created event")
 
-	repo := "ntlaletsi70/for-kaniko-app"
+	repo := "blanketops/for-kaniko-app"
 	filtered, err := c.ListGitHubEvents(ctx, &githubeventpb.ListGitHubEventsRequest{Repository: &repo})
 	require.NoError(t, err)
 	for _, e := range filtered.GetGithubEvents() {

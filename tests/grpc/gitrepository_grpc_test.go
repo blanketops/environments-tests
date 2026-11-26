@@ -49,7 +49,7 @@ func newGitRepositorySpec() *gitrepositorypb.GitRepositorySpec {
 	return &gitrepositorypb.GitRepositorySpec{
 		Provider: &commonv1.GitProvider{Provider: commonv1.GitProvider_GIT_PROVIDER_GITHUB},
 		Repository: &gitrepositorypb.GitRepositoryRef{
-			Owner: "ntlaletsi70",
+			Owner: "blanketops",
 			Name:  "for-kaniko-app",
 		},
 		Webhooks: []*gitrepositorypb.GitRepositoryWebhook{
@@ -90,7 +90,7 @@ func TestGitRepositoryService_CreateGitRepository(t *testing.T) {
 
 	repo := createTestGitRepository(t, c, newGitRepositorySpec())
 
-	assert.Equal(t, "ntlaletsi70", repo.GetSpec().GetRepository().GetOwner())
+	assert.Equal(t, "blanketops", repo.GetSpec().GetRepository().GetOwner())
 	assert.Equal(t, commonv1.GitProvider_GIT_PROVIDER_GITHUB, repo.GetSpec().GetProvider().GetProvider())
 }
 
@@ -157,7 +157,7 @@ func TestGitRepositoryService_PatchGitRepository(t *testing.T) {
 		resp.GetGitRepository().GetSpec().GetWebhooks()[0].GetEvents()[0].GetType(),
 	)
 	// Fields outside the patch survive untouched.
-	assert.Equal(t, "ntlaletsi70", resp.GetGitRepository().GetSpec().GetRepository().GetOwner())
+	assert.Equal(t, "blanketops", resp.GetGitRepository().GetSpec().GetRepository().GetOwner())
 }
 
 func TestGitRepositoryService_ListGitRepositories(t *testing.T) {
