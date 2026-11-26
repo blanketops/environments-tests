@@ -27,7 +27,7 @@ jobs:
       - name: Download and verify the developer binary
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
-          VERSION: v0.0.7
+          VERSION: v0.0.8
         run: |
           set -euo pipefail
           gh release download "$VERSION" -R blanketops/environments-bots \
@@ -43,5 +43,6 @@ jobs:
       - name: Resolve
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          "$RUNNER_TEMP/developer-linux-amd64" resolve -pull "${{ github.event.pull_request.number }}"
+          "$RUNNER_TEMP/developer-linux-amd64" resolve -pull "$PR_NUMBER"
