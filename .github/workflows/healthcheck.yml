@@ -1,5 +1,17 @@
+# =============================================================================
+# healthcheck.yml — Health Check
+#
+# Runs a quick health check subset of critical tests against the Kubernetes
+# API (envtest) and verifies CRDs are ready. Triggered every 6 hours and on
+# manual dispatch.
+#
+# Trigger scope:
+#   schedule (every 6 hours); workflow_dispatch
+#
+# Secrets required:
+#   ALLURE_SERVER_URL, ALLURE_PROJECT_NAME, ALLURE_API_KEY, ALLURE_HOST
+# =============================================================================
 name: Health Check
-
 on:
   schedule:
     - cron: '0 */6 * * *'  # Every 6 hours

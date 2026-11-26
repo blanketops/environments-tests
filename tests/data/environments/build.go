@@ -216,7 +216,7 @@ func NewBuildData(name, namespace, envName string) *BuildData {
 				Kind: StrategyKindCluster,
 			},
 			Source: Source{
-				URL:         "git@github.com:ntlaletsi70/blanketops-app.git",
+				URL:         "git@github.com:blanketops/blanketops-app.git",
 				Revision:    "main",
 				ContextDir:  ".",
 				SSLVerify:   true,

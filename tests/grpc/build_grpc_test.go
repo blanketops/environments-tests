@@ -46,7 +46,7 @@ func newBuildSpec() *buildpb.BuildSpec {
 			Kind: &commonv1.BuildStrategyKind{Kind: commonv1.BuildStrategyKind_BUILD_STRATEGY_KIND_CLUSTER},
 		},
 		Source: &buildpb.GitSource{
-			Url:         "git@github.com:ntlaletsi70/blanketops-app.git",
+			Url:         "git@github.com:blanketops/blanketops-app.git",
 			Revision:    mainBranch,
 			ContextDir:  ".",
 			SslVerify:   true,

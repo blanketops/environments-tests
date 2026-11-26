@@ -211,13 +211,13 @@ func NewPackageData(name, namespace, envName string) *PackageData {
 					},
 				},
 				Repository: PackageRepository{
-					URL:               "git@github.com:ntlaletsi70/" + name + "-packages.git",
+					URL:               "git@github.com:blanketops/" + name + "-packages.git",
 					CredentialsSecret: "git-ssh-credentials-packages",
 					Ref:               "origin/main",
 				},
 				DiffEnabled: true,
 				StateRepository: StateRepository{
-					URL:         "git@github.com:ntlaletsi70/" + name + "-state.git",
+					URL:         "git@github.com:blanketops/" + name + "-state.git",
 					Ref:         "master",
 					CloneSecret: "git-ssh-credentials-state",
 					Strategy:    strategyKustomization,

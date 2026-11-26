@@ -50,12 +50,12 @@ func newPackageSpec() *deploymentpb.PackageSpec {
 			{Name: "Neo", Email: "ntlaletsi86@gmail.com"},
 		},
 		Repository: &deploymentpb.PackageRepository{
-			Url:               "git@github.com:ntlaletsi70/for-kaniko-app-package.git",
+			Url:               "git@github.com:blanketops/for-kaniko-app-package.git",
 			CredentialsSecret: gitSSHSecret,
 		},
 		DiffEnabled: true,
 		StateRepository: &deploymentpb.StateRepository{
-			Url:         "git@github.com:ntlaletsi70/for-kaniko-app-state.git",
+			Url:         "git@github.com:blanketops/for-kaniko-app-state.git",
 			Ref:         mainBranch,
 			CloneSecret: gitSSHSecret,
 			Strategy:    "kustomization",

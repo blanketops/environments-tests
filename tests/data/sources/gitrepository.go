@@ -73,7 +73,7 @@ type GitRepositoryContract struct {
 // GitRepository identifies the GitHub repository to register the webhook on.
 type GitRepository struct {
 	// Repository owner — GitHub org or user.
-	// e.g. ntlaletsi70
+	// e.g. blanketops
 	Owner string `json:"owner"`
 
 	// Repository name — without the owner prefix.
@@ -181,7 +181,7 @@ func NewGitRepositoryData(name, envName string) *GitRepositoryData {
 				Provider: "github",
 				HookURL:  "https://elimination-propecia-meter-strips.trycloudflare.com/",
 				Repository: GitRepository{
-					Owner: "ntlaletsi70",
+					Owner: "blanketops",
 					Name:  name,
 				},
 				Webhooks: []WebhookSubscription{

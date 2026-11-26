@@ -262,7 +262,7 @@ var _ = Describe("Deployment Controller", func() {
 				Expect(json.Unmarshal(deploymentObj.Spec.Contract.Raw, &contract)).To(Succeed())
 				Expect(string(contract.Strategy)).To(Equal(string(tc.strategy)))
 				Expect(contract.ImageAutomation).To(Equal(tc.imageAutomation))
-				Expect(contract.GitOwner).To(Equal("ntlaletsi70"))
+				Expect(contract.GitOwner).To(Equal("blanketops"))
 				Expect(contract.ManifestsRepo.Path).To(Equal("./overlays/dev"))
 			},
 

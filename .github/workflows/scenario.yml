@@ -1,5 +1,17 @@
+# =============================================================================
+# scenario.yml — Scenario Tests
+#
+# Runs scenario test suites (full, upgrade, rollback, multi-env, git-auth,
+# secret-rotation) against envtest. Triggered weekly and on manual dispatch.
+#
+# Trigger scope:
+#   weekly schedule (Sunday 03:00 UTC); workflow_dispatch
+#
+# Secrets required:
+#   ALLURE_SERVER_URL, ALLURE_PROJECT_NAME, ALLURE_API_KEY, ALLURE_HOST,
+#   TESTS_APP_ID, TESTS_APP_PRIVATE_KEY
+# =============================================================================
 name: Scenario Tests
-
 on:
   schedule:
     - cron: '0 3 * * 0'  # Weekly on Sunday at 3 AM
@@ -54,7 +66,7 @@ jobs:
       continue-on-error: true
       uses: actions/create-github-app-token@v3
       with:
-        app-id: ${{ secrets.TESTS_APP_ID }}
+        client-id: ${{ secrets.TESTS_APP_ID }}
         private-key: ${{ secrets.TESTS_APP_PRIVATE_KEY }}
         owner: blanketops
         repositories: environments-tests
@@ -100,45 +112,18 @@ jobs:
     - name: Run scenario tests
       run: |
         SCENARIO="${{ github.event.inputs.scenario }}"
-        echo "Running scenario: $SCENARIO"
+        SCENARIO="${SCENARIO:-full}"
+        echo "Running scenario suite with label filter: $SCENARIO"
 
         mkdir -p reports
         : > reports/scenario-output.json
 
-        case "$SCENARIO" in
-          "full")
-            # Full integration test suite
-            go test ./tests/fake/... ./tests/grpc/... -v -count=1 -timeout 45m -json 2>&1 | tee -a reports/scenario-output.json
-            ;;
-          "upgrade")
-            # Test upgrade scenarios
-            go test ./tests/fake/environments/... -run "Upgrade" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
-            go test ./tests/fake/builds/... -run "Upgrade" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
-            ;;
-          "rollback")
-            # Test rollback scenarios
-            go test ./tests/fake/environments/... -run "Rollback" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
-            go test ./tests/fake/deployments/... -run "Rollback" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
-            ;;
-          "multi-env")
-            # Multi-environment tests
-            go test ./tests/fake/environments/... -run "Multi" -v -count=1 -timeout 30m -json 2>&1 | tee -a reports/scenario-output.json
-            ;;
-          "git-auth")
-            # Git authentication scenarios
-            go test ./tests/fake/git/... -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
-            go test ./tests/grpc/git/... -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
-            ;;
-          "secret-rotation")
-            # Secret rotation tests
-            go test ./tests/fake/secrets/... -run "Rotation" -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
-            go test ./tests/fake/secrets/... -run "Sync" -v -count=1 -timeout 20m -json 2>&1 | tee -a reports/scenario-output.json
-            ;;
-          *)
-            echo "Unknown scenario: $SCENARIO"
-            exit 1
-            ;;
-        esac
+        # Dedicated scenario suite (tests/scenario). Each scenario is a
+        # Ginkgo spec tagged with a Label; -ginkgo.label-filter selects one.
+        # Labels implemented: full, upgrade, multi-env. (rollback, git-auth,
+        # secret-rotation are reserved — selecting them runs zero specs.)
+        go test ./tests/scenario/... -v -count=1 -timeout 45m -json \
+          -args -ginkgo.label-filter="$SCENARIO" 2>&1 | tee -a reports/scenario-output.json
 
     - name: Post results to the test issues
       if: always() && steps.test-helper.outcome == 'success'

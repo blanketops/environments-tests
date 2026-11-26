@@ -71,7 +71,7 @@ type DeploymentContract struct {
 
 	// GitHub org or user that owns the manifests repository.
 	// Used for GitOps audit trail and webhook registration.
-	// e.g. ntlaletsi70
+	// e.g. blanketops
 	GitOwner string `json:"gitOwner"`
 
 	// GitOps repository containing the rendered deployment manifests.
@@ -241,9 +241,9 @@ func NewDeploymentData(name, namespace, envName string) *DeploymentData {
 				Strategy:               DeploymentStrategyRolling,
 				ImageAutomation:        false,
 				ReconciliationStrategy: ReconciliationStrategyKustomize,
-				GitOwner:               "ntlaletsi70",
+				GitOwner:               "blanketops",
 				ManifestsRepo: ManifestsRepo{
-					URL:         "ssh://git@github.com/ntlaletsi70/" + name + "-manifests.git",
+					URL:         "ssh://git@github.com/blanketops/" + name + "-manifests.git",
 					CloneSecret: "git-ssh-credentials",
 					Strategy:    strategyKustomization,
 					Path:        "./overlays/dev",
@@ -261,7 +261,7 @@ func NewMultiUnitDeploymentData(name, namespace, envName string) *DeploymentData
 	d.Spec.Contract.ServiceUnits = []string{name + "-api", name + "-worker"}
 	d.Spec.Contract.ImageAutomation = true
 	d.Spec.Contract.ManifestsRepo = ManifestsRepo{
-		URL:         "git@github.com:ntlaletsi70/" + name + "-manifests.git",
+		URL:         "git@github.com:blanketops/" + name + "-manifests.git",
 		CloneSecret: "git-ssh-credentials",
 		Strategy:    strategyKustomization,
 		Path:        "./bases/kustomization.yaml",

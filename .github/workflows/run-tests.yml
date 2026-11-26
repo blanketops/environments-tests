@@ -1,7 +1,19 @@
-name: Suite Tests
-
+# =============================================================================
+# run-tests.yml — Suite Tests (fake + gRPC via envtest)
+#
 # Pushes run only on the long-lived branches; work branches run through their
-# pull request (see lint.yml).
+# pull request. Runs the fake and gRPC test suites against envtest (etcd +
+# kube-apiserver, no controller, no pods). Posts per-test-file results and
+# sends results to Allure.
+#
+# Trigger scope:
+#   push to test/master; pull_request; workflow_dispatch
+#
+# Secrets required:
+#   ALLURE_SERVER_URL, ALLURE_PROJECT_NAME, ALLURE_API_KEY, ALLURE_HOST,
+#   TESTS_APP_ID, TESTS_APP_PRIVATE_KEY
+# =============================================================================
+name: Suite Tests
 on:
   push:
     branches: [test, master]
@@ -81,7 +93,7 @@ jobs:
       continue-on-error: true
       uses: actions/create-github-app-token@v3
       with:
-        app-id: ${{ secrets.TESTS_APP_ID }}
+        client-id: ${{ secrets.TESTS_APP_ID }}
         private-key: ${{ secrets.TESTS_APP_PRIVATE_KEY }}
         owner: blanketops
         repositories: environments-tests

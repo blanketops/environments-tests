@@ -281,7 +281,7 @@ var _ = Describe("GitRepository Controller", func() {
 				Expect(json.Unmarshal(grObj.Spec.Contract.Raw, &contract)).To(Succeed())
 				Expect(contract.Provider).To(Equal("github"))
 				Expect(contract.HookURL).To(Equal(tc.hookURL))
-				Expect(contract.Repository.Owner).To(Equal("ntlaletsi70"))
+				Expect(contract.Repository.Owner).To(Equal("blanketops"))
 				Expect(contract.Webhooks).To(HaveLen(1))
 				Expect(contract.Webhooks[0].Events).To(HaveLen(len(tc.webhookEvents)))
 			},
@@ -353,7 +353,7 @@ var _ = Describe("GitRepository Controller", func() {
 
 			var contract testdata.GitRepositoryContract
 			Expect(json.Unmarshal(grObj.Spec.Contract.Raw, &contract)).To(Succeed())
-			Expect(contract.Repository.Owner).To(Equal("ntlaletsi70"))
+			Expect(contract.Repository.Owner).To(Equal("blanketops"))
 			Expect(contract.Repository.Name).To(Equal(testEnvName))
 		})
 	})
